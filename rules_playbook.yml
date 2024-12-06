@@ -1,0 +1,12 @@
+
+- hosts: workstations
+  become: true
+  tasks:
+
+  - name: Block ssh
+    command: /scripts/block_ssh.sh
+    register: resultado
+
+  - name: Resultado do script
+    degub:
+      var: resultado.stdout
