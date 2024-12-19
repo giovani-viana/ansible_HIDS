@@ -1,10 +1,24 @@
 - hosts: Workstations
   become: true
+  vars:
+    script_to_run: "block_https" # Defina "block_https" ou "restore_https" para escolher o script a ser executado
   tasks:
-    - name: Block ssh
-      command: /scripts/block_ssh.sh
-      register: resultado
+    - name: Block HTTPS
+      command: /scripts/block_https.sh
+      register: resultado_block_https
+      when: script_to_run == "block_https"
 
-    - name: Resultado do script
+    - name: Resultado do script Block HTTPS
       debug:
-        var: resultado.stdout
+        var: resultado_block_https.stdout
+      when: script_to_run == "block_https"
+
+    - name: Restore HTTPS
+      command: /scripts/restore_https.sh
+      register: resultado_restore_https
+      when: script_to_run == "restore_https"
+
+    - name: Resultado do script Restore HTTPS
+      debug:
+        var: resultado_restore_https.stdout
+      when: script_to_run == "restore_https"
