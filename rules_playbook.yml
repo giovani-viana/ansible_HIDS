@@ -4,7 +4,7 @@
     script_to_run: "block_https" # Defina "block_https" ou "restore_https" para escolher o script a ser executado
   tasks:
     - name: Block HTTPS
-      command: /scripts/block_https.sh
+      script: /scripts/block_https.sh
       register: resultado_block_https
       when: script_to_run == "block_https"
 
@@ -14,7 +14,7 @@
       when: script_to_run == "block_https"
 
     - name: Restore HTTPS
-      command: /scripts/restore_https.sh
+      script: /scripts/restore_https.sh
       register: resultado_restore_https
       when: script_to_run == "restore_https"
 
