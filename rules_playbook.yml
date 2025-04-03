@@ -1,44 +1,71 @@
-- hosts: Mirai_Bots
+- name: Obter lista de IPs da API e aplicar regras de mitigação
+  hosts: localhost
+  gather_facts: false
+  vars:
+    api_url: ""
+    api_timeout: 30
+    api_retries: 3
+    dry_run: false
+  tasks:
+    - name: Obter lista de IPs da API
+      uri:
+        url: "{{ api_url }}"
+        method: GET
+        return_content: yes
+        timeout: "{{ api_timeout }}"
+        status_code: 200
+        validate_certs: yes
+      register: api_response
+      retries: "{{ api_retries }}"
+      delay: 5
+      until: api_response.status == 200
+
+    - name: Verificar se a API retornou os IPs
+      fail:
+        msg: "A API não retornou uma lista de IPs válida."
+      when: api_response.json is not defined or api_response.json|length == 0
+
+    - name: Validar formato dos IPs
+      fail:
+        msg: "IP inválido encontrado: {{ item }}"
+      when: not item is match('^\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}$')
+      loop: "{{ api_response.json }}"
+
+    - name: Criar grupo dinâmico de hosts com base nos IPs retornados
+      add_host:
+        name: "{{ item }}"
+        groups: dynamic_hosts
+      loop: "{{ api_response.json }}"
+      when: not dry_run
+
+- name: Aplicar regras de mitigação nos hosts dinâmicos
+  hosts: dynamic_hosts
   become: true
   vars:
-    script_to_run: "block_https" # Defina "block_https" ou "restore_https" para escolher o script a ser executado
+    script_to_run: "block_https"
+    dry_run: false
   tasks:
     - name: Block HTTPS
       script: ./scripts/block_https.sh
       register: resultado_block_https
-      when: script_to_run == "block_https"
+      when: script_to_run == "block_https" and not dry_run
 
     - name: Resultado do script Block HTTPS
       debug:
         var: resultado_block_https.stdout
       when: script_to_run == "block_https"
 
-    - name: Restore HTTPS
-      script: ./scripts/restore_https.sh
-      register: resultado_restore_https
-      when: script_to_run == "restore_https"
-
-    - name: Resultado do script Restore HTTPS
-      debug:
-        var: resultado_restore_https.stdout
-      when: script_to_run == "restore_https"
-
     - name: Limit HTTPS
       script: ./scripts/limit_https.sh
       register: resultado_limit_https
-      when: script_to_run == "limit_https"
+      when: script_to_run == "limit_https" and not dry_run
 
     - name: Resultado do script Limit HTTPS
       debug:
         var: resultado_limit_https.stdout
       when: script_to_run == "limit_https"
 
-    - name: Reset IPTABLES
-      script: ./scripts/reset_iptables.sh
-      register: resultado_reset_iptables
-      when: script_to_run == "reset_iptables"
-
-    - name: Resultado do script Reset IPTABLES
+    - name: Log de execução
       debug:
-        var: resultado_reset_iptables.stdout
-      when: script_to_run == "reset_iptables"
+        msg: "Execução concluída para o host {{ inventory_hostname }}"
+      when: not dry_run

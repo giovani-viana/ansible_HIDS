@@ -1,0 +1,14 @@
+[Unit]
+Description=Ansible Watchdog Service
+After=network.target
+
+[Service]
+Type=simple
+User=seu_usuario        # Substitua por seu usuário real
+WorkingDirectory=/caminho/onde/esta/playbook  # Diretório onde está o rules_playbook.yml
+ExecStart=/usr/bin/python3 /usr/local/bin/watchdog_service.py
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
