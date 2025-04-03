@@ -1,12 +1,44 @@
-
-- hosts: workstations
+- hosts: Mirai_Bots
   become: true
+  vars:
+    script_to_run: "block_https" # Defina "block_https" ou "restore_https" para escolher o script a ser executado
   tasks:
+    - name: Block HTTPS
+      script: ./scripts/block_https.sh
+      register: resultado_block_https
+      when: script_to_run == "block_https"
 
-  - name: Block ssh
-    command: /scripts/block_ssh.sh
-    register: resultado
+    - name: Resultado do script Block HTTPS
+      debug:
+        var: resultado_block_https.stdout
+      when: script_to_run == "block_https"
 
-  - name: Resultado do script
-    degub:
-      var: resultado.stdout
+    - name: Restore HTTPS
+      script: ./scripts/restore_https.sh
+      register: resultado_restore_https
+      when: script_to_run == "restore_https"
+
+    - name: Resultado do script Restore HTTPS
+      debug:
+        var: resultado_restore_https.stdout
+      when: script_to_run == "restore_https"
+
+    - name: Limit HTTPS
+      script: ./scripts/limit_https.sh
+      register: resultado_limit_https
+      when: script_to_run == "limit_https"
+
+    - name: Resultado do script Limit HTTPS
+      debug:
+        var: resultado_limit_https.stdout
+      when: script_to_run == "limit_https"
+
+    - name: Reset IPTABLES
+      script: ./scripts/reset_iptables.sh
+      register: resultado_reset_iptables
+      when: script_to_run == "reset_iptables"
+
+    - name: Resultado do script Reset IPTABLES
+      debug:
+        var: resultado_reset_iptables.stdout
+      when: script_to_run == "reset_iptables"
