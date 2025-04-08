@@ -4,6 +4,7 @@ import time
 import subprocess
 import logging
 from datetime import datetime
+import os
 
 # Configuração de logging
 logging.basicConfig(
@@ -17,7 +18,7 @@ logging.basicConfig(
 
 class AnsibleWatchdog:
     def __init__(self):
-        self.api_url = "http://sua-api.com/ips" #adicionar endereço da api
+        self.api_url = os.getenv("API_URL", "http://sua-api.com/ips")
         self.check_interval = 300  # 5 minutos
         self.last_ips = set()
 

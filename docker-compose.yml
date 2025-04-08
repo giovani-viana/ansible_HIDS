@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+  ansible_watchdog:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ansible_watchdog
+    volumes:
+      - ./scripts:/app/scripts
+      - ./ansible.cfg:/app/ansible.cfg
+      - ./inventory.ini:/app/inventory.ini
+      - ./rules_playbook.yml:/app/rules_playbook.yml
+    network_mode: "host"  # Necessário para acessar a API e aplicar regras de iptables
+    restart: always
+    environment:
+      - API_URL=http://sua-api.com/ips
