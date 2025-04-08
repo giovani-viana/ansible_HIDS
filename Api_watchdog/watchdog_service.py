@@ -17,7 +17,7 @@ logging.basicConfig(
 
 class AnsibleWatchdog:
     def __init__(self):
-        self.api_url = "http://sua-api.com/ips"
+        self.api_url = "http://sua-api.com/ips" #adicionar endereço da api
         self.check_interval = 300  # 5 minutos
         self.last_ips = set()
 
