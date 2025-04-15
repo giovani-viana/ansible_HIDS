@@ -14,4 +14,7 @@ services:
     network_mode: "host"  # Necessário para acessar a API e aplicar regras de iptables
     restart: always
     environment:
-      - API_URL=http://sua-api.com/ips
+      - API_URL=http://localhost:5000
+      - API_USERNAME=seu_usuario
+      - API_PASSWORD=sua_senha
+      - CHECK_INTERVAL=300
