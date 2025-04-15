@@ -4,9 +4,9 @@ After=network.target
 
 [Service]
 Type=simple
-User=seu_usuario        # Substitua por seu usuário real
-WorkingDirectory=/caminho/onde/esta/playbook  # Diretório onde está o rules_playbook.yml
-ExecStart=/usr/bin/python3 /usr/local/bin/watchdog_service.py
+User=hids        # Substitua por seu usuário real
+WorkingDirectory=/home/hids/ansible_HIPS/rules_playbook.yml  # Diretório onde está o rules_playbook.yml
+ExecStart=/usr/bin/python3 /home/hids/ansible_HIPS/Api_watchdog/watchdog_service.py
 Restart=always
 RestartSec=10
 
