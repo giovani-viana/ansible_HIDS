@@ -6,6 +6,7 @@
     api_timeout: 30
     api_retries: 3
     dry_run: false
+    target_ips: "{{ target_ips }}"
   tasks:
     - name: Obter lista de IPs da API
       uri:
@@ -37,6 +38,10 @@
         groups: dynamic_hosts
       loop: "{{ api_response.json }}"
       when: not dry_run
+
+    - name: Criar lista de IPs
+      set_fact:
+        ip_list: "{{ target_ips.split(',') }}"
 
 - name: Aplicar regras de mitigação nos hosts dinâmicos
   hosts: dynamic_hosts

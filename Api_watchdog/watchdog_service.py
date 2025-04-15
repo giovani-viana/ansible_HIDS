@@ -19,34 +19,32 @@ logging.basicConfig(
 
 class AnsibleWatchdog:
     def __init__(self):
-        # Configurações da API através de variáveis de ambiente do Docker
-        self.api_url = os.environ['API_URL']
-        self.username = os.environ['API_USERNAME']
-        self.password = os.environ['API_PASSWORD']
-        self.check_interval = int(os.environ['CHECK_INTERVAL'])
+        # Configurações da API
+        self.api_url = os.getenv("API_URL", "http://localhost:5000")
+        self.username = os.getenv("API_USERNAME", "seu_usuario")
+        self.password = os.getenv("API_PASSWORD", "sua_senha")
+        self.check_interval = int(os.getenv("CHECK_INTERVAL", "300"))  # 5 minutos
         self.last_ips = set()
         self.access_token = None
-
-        # Log das configurações (sem mostrar a senha)
-        logging.info(f"Configurações carregadas:")
-        logging.info(f"API URL: {self.api_url}")
-        logging.info(f"Username: {self.username}")
-        logging.info(f"Check Interval: {self.check_interval} segundos")
 
     def get_token(self):
         """Obtém o token de autenticação"""
         try:
             response = requests.post(
                 f"{self.api_url}/token",
-                data={"username": self.username, "password": self.password}
+                data={
+                    "username": self.username,
+                    "password": self.password,
+                    "grant_type": "password"  # Necessário para OAuth2PasswordRequestForm
+                }
             )
             response.raise_for_status()
             self.access_token = response.json()["access_token"]
             logging.info("Token de autenticação obtido com sucesso")
+            return True
         except Exception as e:
             logging.error(f"Erro ao obter token de autenticação: {str(e)}")
             return False
-        return True
 
     def get_ips_from_api(self):
         """Obtém IPs de ataques da API"""
@@ -74,25 +72,26 @@ class AnsibleWatchdog:
                 )
 
             response.raise_for_status()
-            dados = response.json()["dados"]
+            ataques = response.json().get("dados", [])
             
-            if not dados:
+            if not ataques:
                 logging.info("Nenhum novo ataque detectado")
                 return set()
+
+            # Extrai os IPs de origem dos ataques (índice 1 é o src_ip)
+            ips = set()
+            for ataque in ataques:
+                if len(ataque) > 1:  # Verifica se há dados suficientes
+                    flow_id = ataque[0]  # flow_id está no índice 0
+                    src_ip = ataque[1]   # src_ip está no índice 1
+                    ips.add(src_ip)
+                    
+                    # Marca o ataque como processado
+                    self.marcar_ataque_processado(flow_id)
             
-            # Extrai apenas os IPs de origem dos ataques
-            ips = set(ataque[1] for ataque in dados)  # src_ip é o segundo campo
-            
-            # Marca os ataques como processados
-            for ataque in dados:
-                flow_id = ataque[0]  # flow_id é o primeiro campo
-                self.marcar_ataque_processado(flow_id)
-            
+            logging.info(f"Encontrados {len(ips)} IPs únicos de ataques")
             return ips
 
-        except requests.exceptions.ConnectionError:
-            logging.error(f"Erro de conexão com a API: {self.api_url}")
-            return None
         except Exception as e:
             logging.error(f"Erro ao obter IPs da API: {str(e)}")
             return None
@@ -114,8 +113,14 @@ class AnsibleWatchdog:
         """Executa o playbook Ansible"""
         try:
             logging.info("Executando playbook Ansible...")
+            # Passa os IPs como variável extra para o playbook
+            ips_str = ','.join(self.last_ips)
             result = subprocess.run(
-                ["ansible-playbook", "rules_playbook.yml"],
+                [
+                    "ansible-playbook",
+                    "rules_playbook.yml",
+                    "-e", f"target_ips={ips_str}"
+                ],
                 capture_output=True,
                 text=True
             )
@@ -135,32 +140,20 @@ class AnsibleWatchdog:
                 current_ips = self.get_ips_from_api()
                 
                 if current_ips is not None and current_ips != self.last_ips:
-                    if current_ips:  # Só loga se houver IPs
-                        logging.info(f"Detectada mudança na lista de IPs")
-                        logging.info(f"IPs anteriores: {self.last_ips}")
-                        logging.info(f"Novos IPs: {current_ips}")
-                        
-                        self.execute_ansible_playbook()
+                    logging.info(f"Detectada mudança na lista de IPs")
+                    logging.info(f"IPs anteriores: {self.last_ips}")
+                    logging.info(f"Novos IPs: {current_ips}")
+                    
+                    if current_ips:  # Só executa se houver IPs para processar
                         self.last_ips = current_ips
+                        self.execute_ansible_playbook()
                 
                 time.sleep(self.check_interval)
-            except KeyboardInterrupt:
-                logging.info("Serviço interrompido pelo usuário")
-                break
+            
             except Exception as e:
                 logging.error(f"Erro no loop principal: {str(e)}")
-                time.sleep(self.check_interval)
+                time.sleep(60)  # Espera 1 minuto antes de tentar novamente
 
 if __name__ == "__main__":
-    try:
-        # Verificar se todas as variáveis de ambiente necessárias estão definidas
-        required_vars = ['API_URL', 'API_USERNAME', 'API_PASSWORD', 'CHECK_INTERVAL']
-        missing_vars = [var for var in required_vars if var not in os.environ]
-        
-        if missing_vars:
-            raise ValueError(f"Variáveis de ambiente faltando: {', '.join(missing_vars)}")
-        
-        watchdog = AnsibleWatchdog()
-        watchdog.run()
-    except Exception as e:
-        logging.error(f"Erro ao iniciar o watchdog: {str(e)}")
+    watchdog = AnsibleWatchdog()
+    watchdog.run()
