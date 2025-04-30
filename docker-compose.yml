@@ -11,10 +11,10 @@ services:
       - ./ansible.cfg:/app/ansible.cfg
       - ./inventory.ini:/app/inventory.ini
       - ./rules_playbook.yml:/app/rules_playbook.yml
-    network_mode: "host"  # Necessário para acessar a API e aplicar regras de iptables
+    network_mode: "host"
     restart: always
     environment:
       - API_URL=http://164.72.15.30:5050
-      - API_USERNAME=admin
-      - API_PASSWORD=admin
-      - CHECK_INTERVAL=300
+      - API_USERNAME=hids
+      - API_PASSWORD=hids
+      - CHECK_INTERVAL=15

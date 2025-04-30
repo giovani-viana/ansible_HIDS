@@ -95,6 +95,31 @@ class AnsibleWatchdog:
         except Exception as e:
             logging.error(f"Erro ao obter IPs da API: {str(e)}")
             return None
+    
+    def execute_ansible_playbook(self):
+        """Executa o playbook Ansible"""
+        try:
+            logging.info("Executando playbook Ansible...")
+            # Passa os IPs como variável extra para o playbook
+            ips_str = ','.join(self.last_ips)
+            result = subprocess.run(
+                [
+                    "ansible-playbook",
+                    "rules_playbook.yml",
+                    "-e", f"target_ips={ips_str}",
+                    "-e", f"access_token={self.access_token}",
+                    "-vvv"
+                ],
+                capture_output=True,
+                text=True
+            )
+            if result.returncode == 0:
+                logging.info("Playbook executado com sucesso")
+            else:
+                logging.error(f"Erro na execução do playbook: {result.stderr}")
+                logging.error(f"Saída completa do comando: {result.stdout}")
+        except Exception as e:
+            logging.error(f"Erro ao executar playbook: {str(e)}")
 
     def marcar_ataque_processado(self, flow_id):
         """Marca um ataque como processado na API"""
@@ -108,28 +133,6 @@ class AnsibleWatchdog:
             logging.info(f"Ataque {flow_id} marcado como processado")
         except Exception as e:
             logging.error(f"Erro ao marcar ataque {flow_id} como processado: {str(e)}")
-
-    def execute_ansible_playbook(self):
-        """Executa o playbook Ansible"""
-        try:
-            logging.info("Executando playbook Ansible...")
-            # Passa os IPs como variável extra para o playbook
-            ips_str = ','.join(self.last_ips)
-            result = subprocess.run(
-                [
-                    "ansible-playbook",
-                    "rules_playbook.yml",
-                    "-e", f"target_ips={ips_str}"
-                ],
-                capture_output=True,
-                text=True
-            )
-            if result.returncode == 0:
-                logging.info("Playbook executado com sucesso")
-            else:
-                logging.error(f"Erro na execução do playbook: {result.stderr}")
-        except Exception as e:
-            logging.error(f"Erro ao executar playbook: {str(e)}")
 
     def run(self):
         """Loop principal do watchdog"""
