@@ -51,7 +51,7 @@ class AnsibleWatchdog:
         try:
             # Verifica se precisa renovar o token
             if not self.access_token and not self.get_token():
-                return None
+                return None, []
 
             headers = {"Authorization": f"Bearer {self.access_token}"}
             response = requests.get(
@@ -63,7 +63,7 @@ class AnsibleWatchdog:
             # Se o token expirou, tenta renovar
             if response.status_code == 401:
                 if not self.get_token():
-                    return None
+                    return None, []
                 headers = {"Authorization": f"Bearer {self.access_token}"}
                 response = requests.get(
                     f"{self.api_url}/dados/ataques/novos",
@@ -76,37 +76,38 @@ class AnsibleWatchdog:
             
             if not ataques:
                 logging.info("Nenhum novo ataque detectado")
-                return set()
+                return set(), []
 
-            # Extrai os IPs de origem dos ataques (índice 1 é o src_ip)
+            # Extrai os IPs de origem dos ataques e seus flow_ids
             ips = set()
+            flow_ids = []
             for ataque in ataques:
                 if len(ataque) > 1:  # Verifica se há dados suficientes
                     flow_id = ataque[0]  # flow_id está no índice 0
                     src_ip = ataque[1]   # src_ip está no índice 1
                     ips.add(src_ip)
-                    
-                    # Marca o ataque como processado
-                    self.marcar_ataque_processado(flow_id)
+                    flow_ids.append(flow_id)
             
             logging.info(f"Encontrados {len(ips)} IPs únicos de ataques")
-            return ips
+            return ips, flow_ids
 
         except Exception as e:
             logging.error(f"Erro ao obter IPs da API: {str(e)}")
-            return None
-    
-    def execute_ansible_playbook(self):
+            return None, []
+
+    def execute_ansible_playbook(self, flow_ids):
         """Executa o playbook Ansible"""
         try:
             logging.info("Executando playbook Ansible...")
-            # Passa os IPs como variável extra para o playbook
+            # Passa os IPs e flow_ids como variáveis extras para o playbook
             ips_str = ','.join(self.last_ips)
+            flow_ids_str = ','.join(flow_ids)
             result = subprocess.run(
                 [
                     "ansible-playbook",
                     "rules_playbook.yml",
                     "-e", f"target_ips={ips_str}",
+                    "-e", f"flow_ids={flow_ids_str}",
                     "-e", f"access_token={self.access_token}",
                     "-vvv"
                 ],
@@ -115,11 +116,14 @@ class AnsibleWatchdog:
             )
             if result.returncode == 0:
                 logging.info("Playbook executado com sucesso")
+                return True
             else:
                 logging.error(f"Erro na execução do playbook: {result.stderr}")
                 logging.error(f"Saída completa do comando: {result.stdout}")
+                return False
         except Exception as e:
             logging.error(f"Erro ao executar playbook: {str(e)}")
+            return False
 
     def marcar_ataque_processado(self, flow_id):
         """Marca um ataque como processado na API"""
@@ -140,7 +144,7 @@ class AnsibleWatchdog:
         
         while True:
             try:
-                current_ips = self.get_ips_from_api()
+                current_ips, flow_ids = self.get_ips_from_api()
                 
                 if current_ips is not None and current_ips != self.last_ips:
                     logging.info(f"Detectada mudança na lista de IPs")
@@ -149,7 +153,10 @@ class AnsibleWatchdog:
                     
                     if current_ips:  # Só executa se houver IPs para processar
                         self.last_ips = current_ips
-                        self.execute_ansible_playbook()
+                        if self.execute_ansible_playbook(flow_ids):
+                            # Marca os ataques como processados somente após o playbook ser executado com sucesso
+                            for flow_id in flow_ids:
+                                self.marcar_ataque_processado(flow_id)
                 
                 time.sleep(self.check_interval)
             

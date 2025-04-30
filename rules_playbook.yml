@@ -5,6 +5,7 @@
     api_url: "http://164.72.15.30:5050/dados/ataques/novos"
     api_retries: 3
     target_ips: "{{ target_ips }}"
+    flow_ids: "{{ flow_ids }}"
     access_token: "{{ access_token }}"
 
   tasks:
@@ -41,7 +42,7 @@
       add_host:
         name: "{{ item }}"
         groups: dynamic_hosts
-      loop: "{{ api_response.json }}"
+      loop: "{{ api_response.json.dados }}"
       when: not dry_run
 
     - name: Criar lista de IPs
