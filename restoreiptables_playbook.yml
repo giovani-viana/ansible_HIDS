@@ -1,0 +1,19 @@
+- name: Testar conectividade SSH e restaurar tráfego HTTP e HTTPS
+  hosts: Mirai_Bots
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Testar conectividade SSH
+      ping:
+
+    - name: Restaurar tráfego HTTP e HTTPS
+      script: ./scripts/restore_https.sh
+      register: resultado_restore_https
+
+    - name: Resultado do script restore_https
+      debug:
+        var: resultado_restore_https.stdout
+
+    - name: Log de execução
+      debug:
+        msg: "Script restore_https aplicado com sucesso no host {{ inventory_hostname }}"

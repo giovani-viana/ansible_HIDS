@@ -13,6 +13,18 @@
       debug:
         var: api_url
 
+    - name: Verificar variáveis obrigatórias
+      fail:
+        msg: "As variáveis target_ips, flow_ids ou access_token não estão definidas."
+      when: target_ips is not defined or flow_ids is not defined or access_token is not defined
+
+    - name: Verificar variáveis recebidas
+      debug:
+        msg:
+          - "target_ips: {{ target_ips }}"
+          - "flow_ids: {{ flow_ids }}"
+          - "access_token: {{ access_token }}"
+
     - name: Obter lista de IPs da API
       uri:
         url: "{{ api_url }}"
@@ -57,6 +69,9 @@
     dry_run: false
 
   tasks:
+    - name: Testar conectividade SSH
+      ping:
+
     - name: Block HTTPS
       script: ./scripts/block_https.sh
       register: resultado_block_https
@@ -64,18 +79,7 @@
 
     - name: Resultado do script Block HTTPS
       debug:
-        var: resultado_block_https.stdout
-      when: script_to_run == "block_https"
-
-    - name: Limit HTTPS
-      script: ./scripts/limit_https.sh
-      register: resultado_limit_https
-      when: script_to_run == "limit_https" and not dry_run
-
-    - name: Resultado do script Limit HTTPS
-      debug:
-        var: resultado_limit_https.stdout
-      when: script_to_run == "limit_https"
+        var: resultado_block_https
 
     - name: Log de execução
       debug:

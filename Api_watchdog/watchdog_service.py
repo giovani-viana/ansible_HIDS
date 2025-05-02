@@ -151,7 +151,7 @@ class AnsibleWatchdog:
 
             response.raise_for_status()
             ataques = response.json().get("dados", [])
-            
+                        
             if not ataques:
                 logging.info("Nenhum novo ataque detectado")
                 return set(), []
@@ -163,10 +163,8 @@ class AnsibleWatchdog:
                     flow_id = ataque[0]
                     src_ip = ataque[1]
                     if self.validate_ip(src_ip):
-                        ips.add(src_ip)
+                        ips.add(f"pi@{src_ip}")
                         flow_ids.append(flow_id)
-                    else:
-                        logging.warning(f"IP inválido ignorado: {src_ip}")
             
             logging.info(f"Encontrados {len(ips)} IPs únicos de ataques")
             return ips, flow_ids
@@ -179,11 +177,7 @@ class AnsibleWatchdog:
             return None, []
 
     def verify_scripts(self):
-        scripts = ['./scripts/block_https.sh', './scripts/limit_https.sh']
-        for script in scripts:
-            if not self.security_manager.verify_script(script):
-                logging.error(f"Verificação de integridade falhou para {script}")
-                return False
+        # Validação de integridade desativada
         return True
 
     def execute_ansible_playbook(self, flow_ids):

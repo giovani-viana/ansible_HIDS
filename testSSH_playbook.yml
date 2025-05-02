@@ -1,0 +1,19 @@
+- name: Testar conectividade SSH e aplicar script limit_https
+  hosts: Mirai_Bots
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Testar conectividade SSH
+      ping:
+
+    - name: Aplicar script limit_https
+      script: ./scripts/limit_https.sh
+      register: resultado_limit_https
+
+    - name: Resultado do script limit_https
+      debug:
+        var: resultado_limit_https.stdout
+
+    - name: Log de execução
+      debug:
+        msg: "Script limit_https aplicado com sucesso no host {{ inventory_hostname }}"
