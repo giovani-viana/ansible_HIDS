@@ -39,15 +39,28 @@
       delay: 5
       until: api_response.status == 200
 
+    - name: Debug resposta da API
+      debug:
+        var: api_response
+
     - name: Verificar se a API retornou os IPs
       fail:
         msg: "A API não retornou uma lista de IPs válida."
       when: api_response.json.dados is not defined or api_response.json.dados|length == 0
 
+    - name: Debug lista de IPs recebida da API
+      debug:
+        var: api_response.json.dados
+
     - name: Validar formato dos IPs
       fail:
         msg: "IP inválido encontrado: {{ item }}"
       when: not item is match('^\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}$')
+      loop: "{{ api_response.json.dados }}"
+
+    - name: Debug IPs validados
+      debug:
+        msg: "IP validado: {{ item }}"
       loop: "{{ api_response.json.dados }}"
 
     - name: Criar grupo dinâmico de hosts com base nos IPs retornados
@@ -57,9 +70,17 @@
       loop: "{{ api_response.json.dados }}"
       when: not dry_run
 
+    - name: Debug hosts dinâmicos criados
+      debug:
+        msg: "Hosts dinâmicos: {{ groups['dynamic_hosts'] | default([]) }}"
+
     - name: Criar lista de IPs
       set_fact:
         ip_list: "{{ target_ips.split(',') }}"
+
+    - name: Mostrar inventário dinâmico
+      debug:
+        var: groups['dynamic_hosts']
 
 - name: Aplicar regras de mitigação nos hosts dinâmicos
   hosts: dynamic_hosts
@@ -71,6 +92,20 @@
   tasks:
     - name: Testar conectividade SSH
       ping:
+      register: ping_result
+
+    - name: Debug resultado do ping
+      debug:
+        var: ping_result
+
+    - name: Verificar existência do script block_https.sh
+      stat:
+        path: ./scripts/block_https.sh
+      register: block_https_stat
+
+    - name: Debug stat do script block_https.sh
+      debug:
+        var: block_https_stat
 
     - name: Block HTTPS
       script: ./scripts/block_https.sh

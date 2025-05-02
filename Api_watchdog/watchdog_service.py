@@ -197,19 +197,21 @@ class AnsibleWatchdog:
                     "-e", f"target_ips={ips_str}",
                     "-e", f"flow_ids={flow_ids_str}",
                     "-e", f"access_token={self.access_token}",
-                    "-vvv"
+                    "-vvvv"  # Máxima verbosidade
                 ],
                 capture_output=True,
                 text=True,
                 check=True
             )
-            
             logging.info("Playbook executado com sucesso")
+            logging.info(f"STDOUT do playbook:\n{result.stdout}")
+            logging.info(f"STDERR do playbook:\n{result.stderr}")
             self.retry_attempt = 0
             return True
             
         except subprocess.CalledProcessError as e:
             logging.error(f"Erro na execução do playbook: {e.stderr}")
+            logging.error(f"Saída completa do comando: {e.stdout}")
             return False
         except Exception as e:
             logging.error(f"Erro ao executar playbook: {str(e)}")
