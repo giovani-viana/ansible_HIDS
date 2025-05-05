@@ -8,6 +8,7 @@
     flow_ids: "{{ flow_ids }}"
     access_token: "{{ access_token }}"
     inventory_file: "inventory.ini"
+    scripts_dir: "{{ playbook_dir }}/scripts"
 
   tasks:
     - name: Verificar variáveis obrigatórias
@@ -26,6 +27,22 @@
       set_fact:
         ip_list: "{{ target_ips.split(',') }}"
 
+    - name: Validar formato dos IPs
+      fail:
+        msg: "IP inválido encontrado: {{ item }}. O formato deve ser 'pi@IP'"
+      when: not item is match('^pi@\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}$')
+      loop: "{{ ip_list }}"
+
+    - name: Verificar diretório de scripts
+      stat:
+        path: "{{ scripts_dir }}"
+      register: scripts_dir_stat
+
+    - name: Falhar se diretório de scripts não existir
+      fail:
+        msg: "Diretório de scripts não encontrado em {{ scripts_dir }}"
+      when: not scripts_dir_stat.stat.exists
+
     - name: Atualizar arquivo inventory.ini
       copy:
         content: |
@@ -43,36 +60,55 @@
 - name: Aplicar regras de mitigação nos hosts do inventory
   hosts: Mirai_Bots
   become: true
+  become_user: pi
   vars:
     script_to_run: "block_https"
     dry_run: false
+    scripts_dir: "{{ playbook_dir }}/scripts"
 
   tasks:
     - name: Testar conectividade SSH
       ping:
       register: ping_result
+      ignore_errors: true
 
     - name: Debug resultado do ping
       debug:
         var: ping_result
 
+    - name: Falhar se não houver conectividade
+      fail:
+        msg: "Não foi possível estabelecer conexão com o host {{ inventory_hostname }}"
+      when: ping_result is failed
+
     - name: Verificar existência do script block_https.sh
       stat:
-        path: ./scripts/block_https.sh
+        path: "{{ scripts_dir }}/block_https.sh"
       register: block_https_stat
 
     - name: Debug stat do script block_https.sh
       debug:
         var: block_https_stat
 
+    - name: Falhar se script não existir
+      fail:
+        msg: "Script block_https.sh não encontrado em {{ scripts_dir }}"
+      when: not block_https_stat.stat.exists
+
     - name: Block HTTPS
-      script: ./scripts/block_https.sh
+      script: "{{ scripts_dir }}/block_https.sh"
       register: resultado_block_https
       when: script_to_run == "block_https" and not dry_run
+      ignore_errors: true
 
     - name: Resultado do script Block HTTPS
       debug:
         var: resultado_block_https
+
+    - name: Falhar se script retornou erro
+      fail:
+        msg: "Erro ao executar script block_https.sh no host {{ inventory_hostname }}"
+      when: resultado_block_https is failed
 
     - name: Log de execução
       debug:
