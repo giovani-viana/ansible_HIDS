@@ -197,7 +197,7 @@ class AnsibleWatchdog:
                     "-e", f"target_ips={ips_str}",
                     "-e", f"flow_ids={flow_ids_str}",
                     "-e", f"access_token={self.access_token}",
-                    "-vvvv"  # Máxima verbosidade
+                    "-vvvv",
                 ],
                 capture_output=True,
                 text=True,
@@ -211,10 +211,8 @@ class AnsibleWatchdog:
             
         except subprocess.CalledProcessError as e:
             logging.error(f"Erro na execução do playbook: {e.stderr}")
-            logging.error(f"Saída completa do comando: {e.stdout}")
             return False
         except Exception as e:
-            logging.error(f"Erro ao executar playbook: {str(e)}")
             return False
 
     def exponential_backoff(self):
