@@ -18,6 +18,7 @@ services:
       - CHECK_INTERVAL=15
       - LOG_LEVEL=INFO
       - PRIVATE_KEY_FILE=/home/hids/.ssh/id_rsa
+    network_mode: "host"
     restart: unless-stopped
     user: hids
     tty: true

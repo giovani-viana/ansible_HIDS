@@ -5,6 +5,8 @@ RUN apt-get update && apt-get install -y \
     openssh-client \
     ansible \
     sqlite3 \
+    iputils-ping \
+    net-tools \
     && rm -rf /var/lib/apt/lists/*
 
 # Criar usuário não-root

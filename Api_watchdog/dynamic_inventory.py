@@ -4,6 +4,7 @@ import sys
 import os
 import requests
 import logging
+import subprocess
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional
 from config import Config
@@ -36,6 +37,36 @@ class DynamicInventory:
                 format='%(asctime)s - %(levelname)s - %(message)s',
                 stream=sys.stderr
             )
+
+    def check_host_connectivity(self, host: str) -> bool:
+        try:
+            # Primeiro, verifica se o host responde ao ping
+            ping_result = subprocess.run(
+                ['ping', '-c', '1', '-W', '5', host.split('@')[1]],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE
+            )
+            
+            if ping_result.returncode != 0:
+                logging.warning(f"Host {host} não responde ao ping")
+                return False
+
+            # Tenta conexão SSH
+            ssh_result = subprocess.run(
+                ['ssh', '-o', 'ConnectTimeout=5', '-o', 'StrictHostKeyChecking=no', host, 'echo "test"'],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE
+            )
+            
+            if ssh_result.returncode != 0:
+                logging.warning(f"Não foi possível conectar via SSH ao host {host}: {ssh_result.stderr.decode()}")
+                return False
+
+            logging.info(f"Host {host} está acessível")
+            return True
+        except Exception as e:
+            logging.error(f"Erro ao verificar conectividade do host {host}: {str(e)}")
+            return False
 
     def get_token(self) -> bool:
         if (self.access_token and self.token_expiration and 
@@ -131,19 +162,24 @@ class DynamicInventory:
             "Mirai_Bots": {
                 "hosts": [],
                 "vars": {
-                    "ansible_ssh_common_args": "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null",
+                    "ansible_ssh_common_args": Config.SSH_COMMON_ARGS,
                     "ansible_ssh_private_key_file": Config.PRIVATE_KEY_FILE,
                     "ansible_become": True,
                     "ansible_become_method": "sudo",
-                    "ansible_become_user": "root"
+                    "ansible_become_user": "root",
+                    "ansible_ssh_retries": Config.ANSIBLE_RETRY_COUNT,
+                    "ansible_ssh_retry_delay": Config.ANSIBLE_RETRY_DELAY
                 }
             }
         }
 
         for ip in hosts:
             hostname = f"pi@{ip}"
-            inventory["Mirai_Bots"]["hosts"].append(hostname)
-            logging.debug(f"Host adicionado ao inventário: {hostname}")
+            if self.check_host_connectivity(hostname):
+                inventory["Mirai_Bots"]["hosts"].append(hostname)
+                logging.debug(f"Host adicionado ao inventário: {hostname}")
+            else:
+                logging.warning(f"Host {hostname} não está acessível e será ignorado")
         
         return inventory
 
