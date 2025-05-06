@@ -46,29 +46,28 @@ class AnsibleWatchdog:
         self.retry_attempt = 0
         
     def setup_logging(self):
-        """Configura o sistema de logging"""
         try:
             # Criar diretório de logs se não existir
             os.makedirs(Config.LOG_DIR, exist_ok=True)
             
-            # Configurar o logger
+            # Configurar logging
             logger = logging.getLogger()
             logger.setLevel(logging.INFO)
             
-            # Configurar formato do log
+            # Formato do log
             formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
             
-            # Configurar handler para arquivo
+            # Handler para arquivo
             file_handler = logging.FileHandler(Config.LOG_FILE)
             file_handler.setFormatter(formatter)
             logger.addHandler(file_handler)
             
-            # Configurar handler para console
+            # Handler para console
             console_handler = logging.StreamHandler()
             console_handler.setFormatter(formatter)
             logger.addHandler(console_handler)
             
-            logging.info("Sistema de logging configurado com sucesso")
+            logging.info("Logging configurado com sucesso")
             
         except Exception as e:
             print(f"Erro ao configurar logging: {str(e)}")
