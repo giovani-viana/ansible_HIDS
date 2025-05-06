@@ -1,34 +1,8 @@
-- name: Obter lista de IPs da API e aplicar regras de mitigação
+- name: Aplicar regras de mitigação
   hosts: Mirai_Bots
   gather_facts: false
   vars:
-    api_url: "http://164.72.15.30:5050/dados/ataques/novos"
-    api_retries: 3
-    flow_ids: "{{ flow_ids }}"
-    access_token: "{{ access_token }}"
     scripts_dir: "/app/scripts"
-
-  pre_tasks:
-    - name: Verificar variáveis obrigatórias
-      fail:
-        msg: "As variáveis flow_ids ou access_token não estão definidas."
-      when: flow_ids is not defined or access_token is not defined
-
-    - name: Verificar variáveis recebidas
-      debug:
-        msg:
-          - "flow_ids: {{ flow_ids }}"
-          - "access_token: {{ access_token }}"
-
-    - name: Verificar diretório de scripts
-      stat:
-        path: "{{ scripts_dir }}"
-      register: scripts_dir_stat
-
-    - name: Falhar se diretório de scripts não existir
-      fail:
-        msg: "Diretório de scripts não encontrado em {{ scripts_dir }}"
-      when: not scripts_dir_stat.stat.exists
 
   tasks:
     - name: Testar conectividade SSH
