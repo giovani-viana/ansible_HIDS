@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 import requests
 import time
-import subprocess
 import logging
 from logging.handlers import RotatingFileHandler
 from datetime import datetime, timedelta
@@ -36,42 +35,10 @@ class StateManager:
     def last_ips(self):
         return set(self.state.get("last_ips", []))
 
-class SecurityManager:
-    def __init__(self, checksums_file):
-        self.checksums_file = checksums_file
-        self.load_checksums()
-        
-    def load_checksums(self):
-        try:
-            with open(self.checksums_file, 'r') as f:
-                self.checksums = json.load(f)
-        except:
-            self.checksums = {}
-            
-    def verify_script(self, script_path):
-        if not os.path.exists(script_path):
-            return False
-            
-        with open(script_path, 'rb') as f:
-            content = f.read()
-            current_hash = hashlib.sha256(content).hexdigest()
-            
-        return current_hash == self.checksums.get(script_path)
-        
-    def update_checksum(self, script_path):
-        with open(script_path, 'rb') as f:
-            content = f.read()
-            self.checksums[script_path] = hashlib.sha256(content).hexdigest()
-            
-        os.makedirs(os.path.dirname(self.checksums_file), exist_ok=True)
-        with open(self.checksums_file, 'w') as f:
-            json.dump(self.checksums, f)
-
 class AnsibleWatchdog:
     def __init__(self):
         self.setup_logging()
         self.state_manager = StateManager(Config.STATE_FILE)
-        self.security_manager = SecurityManager(Config.SCRIPT_CHECKSUMS_FILE)
         self.access_token = None
         self.token_expiration = None
         self.retry_attempt = 0
@@ -107,7 +74,6 @@ class AnsibleWatchdog:
             response.raise_for_status()
             token_data = response.json()
             self.access_token = token_data["access_token"]
-            # Assumindo que o token expira em 30 minutos
             self.token_expiration = datetime.now() + timedelta(minutes=30)
             logging.info("Token de autenticação obtido com sucesso")
             return True
@@ -176,50 +142,18 @@ class AnsibleWatchdog:
             logging.error(f"Erro ao obter IPs: {str(e)}")
             return None, []
 
-    def verify_scripts(self):
-        # Validação de integridade desativada
-        return True
-
-    def execute_ansible_playbook(self, flow_ids):
-        if not self.verify_scripts():
-            logging.error("Verificação de scripts falhou")
-            return False
-
-        try:
-            logging.info("Executando playbook Ansible...")
-            ips_str = ','.join(self.state_manager.last_ips)
-            flow_ids_str = ','.join(map(str, flow_ids))
-            
-            result = subprocess.run(
-                [
-                    "ansible-playbook",
-                    "rules_playbook.yml",
-                    "-e", f"target_ips={ips_str}",
-                    "-e", f"flow_ids={flow_ids_str}",
-                    "-e", f"access_token={self.access_token}",
-                    "-vvvv",
-                ],
-                capture_output=True,
-                text=True,
-                check=True
-            )
-            logging.info("Playbook executado com sucesso")
-            logging.info(f"STDOUT do playbook:\n{result.stdout}")
-            logging.info(f"STDERR do playbook:\n{result.stderr}")
-            self.retry_attempt = 0
-            return True
-            
-        except subprocess.CalledProcessError as e:
-            logging.error(f"Erro na execução do playbook: {e.stderr}")
-            return False
-        except Exception as e:
-            return False
-
-    def exponential_backoff(self):
-        delay = min(Config.MAX_RETRY_INTERVAL, 
-                   Config.CHECK_INTERVAL * (2 ** self.retry_attempt))
-        self.retry_attempt += 1
-        return delay
+    def save_ansible_vars(self, ips, flow_ids):
+        """Salva as variáveis necessárias para o Ansible em um arquivo JSON"""
+        ansible_vars = {
+            "target_ips": ",".join(ips),
+            "flow_ids": flow_ids,
+            "access_token": self.access_token
+        }
+        
+        os.makedirs(os.path.dirname(Config.ANSIBLE_VARS_FILE), exist_ok=True)
+        with open(Config.ANSIBLE_VARS_FILE, 'w') as f:
+            json.dump(ansible_vars, f)
+        logging.info(f"Variáveis do Ansible salvas em {Config.ANSIBLE_VARS_FILE}")
 
     def run(self):
         logging.info("Iniciando serviço de monitoramento...")
@@ -235,9 +169,8 @@ class AnsibleWatchdog:
                     
                     if current_ips:
                         self.state_manager.save_state(current_ips)
-                        if self.execute_ansible_playbook(flow_ids):
-                            for flow_id in flow_ids:
-                                self.marcar_ataque_processado(flow_id)
+                        self.save_ansible_vars(current_ips, flow_ids)
+                        logging.info("Arquivos de configuração atualizados. Execute o playbook Ansible manualmente.")
                 
                 time.sleep(Config.CHECK_INTERVAL)
                 

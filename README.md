@@ -145,3 +145,7 @@ ansible_HIPS/
 ## Suporte
 
 Para reportar problemas ou sugerir melhorias, abra uma issue no repositório.
+
+docker run -d --name watchdog -v $(pwd)/state:/app/state -v $(pwd)/logs:/app/logs watchdog
+
+python run_ansible.py
