@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import requests
 import time
+import subprocess
 import logging
 from logging.handlers import RotatingFileHandler
 from datetime import datetime, timedelta
@@ -142,18 +143,44 @@ class AnsibleWatchdog:
             logging.error(f"Erro ao obter IPs: {str(e)}")
             return None, []
 
-    def save_ansible_vars(self, ips, flow_ids):
-        """Salva as variáveis necessárias para o Ansible em um arquivo JSON"""
-        ansible_vars = {
-            "target_ips": ",".join(ips),
-            "flow_ids": flow_ids,
-            "access_token": self.access_token
-        }
-        
-        os.makedirs(os.path.dirname(Config.ANSIBLE_VARS_FILE), exist_ok=True)
-        with open(Config.ANSIBLE_VARS_FILE, 'w') as f:
-            json.dump(ansible_vars, f)
-        logging.info(f"Variáveis do Ansible salvas em {Config.ANSIBLE_VARS_FILE}")
+    def execute_ansible_playbook(self, ips, flow_ids):
+        try:
+            logging.info("Executando playbook Ansible...")
+            ips_str = ','.join(ips)
+            flow_ids_str = ','.join(map(str, flow_ids))
+            
+            result = subprocess.run(
+                [
+                    "ansible-playbook",
+                    "rules_playbook.yml",
+                    "-e", f"target_ips={ips_str}",
+                    "-e", f"flow_ids={flow_ids_str}",
+                    "-e", f"access_token={self.access_token}",
+                    "-vvvv",
+                ],
+                capture_output=True,
+                text=True,
+                check=True
+            )
+            logging.info("Playbook executado com sucesso")
+            logging.info(f"STDOUT do playbook:\n{result.stdout}")
+            if result.stderr:
+                logging.warning(f"STDERR do playbook:\n{result.stderr}")
+            self.retry_attempt = 0
+            return True
+            
+        except subprocess.CalledProcessError as e:
+            logging.error(f"Erro na execução do playbook: {e.stderr}")
+            return False
+        except Exception as e:
+            logging.error(f"Erro inesperado: {str(e)}")
+            return False
+
+    def exponential_backoff(self):
+        delay = min(Config.MAX_RETRY_INTERVAL, 
+                   Config.CHECK_INTERVAL * (2 ** self.retry_attempt))
+        self.retry_attempt += 1
+        return delay
 
     def run(self):
         logging.info("Iniciando serviço de monitoramento...")
@@ -169,8 +196,10 @@ class AnsibleWatchdog:
                     
                     if current_ips:
                         self.state_manager.save_state(current_ips)
-                        self.save_ansible_vars(current_ips, flow_ids)
-                        logging.info("Arquivos de configuração atualizados. Execute o playbook Ansible manualmente.")
+                        if self.execute_ansible_playbook(current_ips, flow_ids):
+                            logging.info("Mitigação aplicada com sucesso")
+                        else:
+                            logging.error("Falha ao aplicar mitigação")
                 
                 time.sleep(Config.CHECK_INTERVAL)
                 

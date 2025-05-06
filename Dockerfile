@@ -1,31 +1,37 @@
-# Base image
-FROM ubuntu:20.04
+FROM python:3.9-slim
 
-# Configurações básicas
-ENV DEBIAN_FRONTEND=noninteractive
+# Instalar dependências do sistema
 RUN apt-get update && apt-get install -y \
-    python3 \
-    python3-pip \
+    openssh-client \
     ansible \
-    iptables \
-    curl \
-    sudo \
-    && apt-get clean
+    && rm -rf /var/lib/apt/lists/*
+
+# Criar diretórios necessários
+RUN mkdir -p /app/state /app/logs /app/scripts
+
+# Copiar arquivos da aplicação
+COPY Api_watchdog /app/Api_watchdog
+COPY rules_playbook.yml /app/
+COPY run_ansible.py /app/
+COPY scripts /app/scripts/
 
 # Configurar diretório de trabalho
 WORKDIR /app
 
-# Copiar arquivos do projeto
-COPY . /app
+# Instalar dependências Python
+RUN pip install requests
 
-# Instalar dependências do Python
-RUN pip3 install -r ./requirements.txt
+# Criar usuário não-root
+RUN useradd -m -s /bin/bash hids
+RUN chown -R hids:hids /app
 
-# Permitir execução dos scripts
-RUN chmod +x scripts/*.sh
+# Configurar SSH
+RUN mkdir -p /home/hids/.ssh
+RUN chown -R hids:hids /home/hids/.ssh
+RUN chmod 700 /home/hids/.ssh
 
-# Configurar o Ansible
-ENV ANSIBLE_CONFIG=/app/ansible.cfg
+# Mudar para usuário não-root
+USER hids
 
 # Comando padrão
-CMD ["python3", "Api_watchdog/watchdog_service.py"]
+CMD ["python", "Api_watchdog/watchdog_service.py"]

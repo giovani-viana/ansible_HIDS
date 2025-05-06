@@ -1,6 +1,19 @@
 version: '3.8'
 
 services:
+  hips:
+    build: .
+    container_name: hips
+    volumes:
+      - ./state:/app/state
+      - ./logs:/app/logs
+      - ./scripts:/app/scripts
+      - ~/.ssh:/home/hids/.ssh:ro
+    environment:
+      - TZ=America/Sao_Paulo
+    restart: unless-stopped
+    user: hids
+
   ansible_watchdog:
     build:
       context: .
