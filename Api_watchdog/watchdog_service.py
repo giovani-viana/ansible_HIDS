@@ -149,7 +149,6 @@ class AnsibleWatchdog:
         try:
             logging.info("Executando playbook Ansible...")
             flow_ids_str = ','.join(map(str, flow_ids))
-            target_ips_str = ','.join(ips)
             
             # Executando o playbook com saída em tempo real
             process = subprocess.Popen(
@@ -157,10 +156,10 @@ class AnsibleWatchdog:
                     "ansible-playbook",
                     "rules_playbook.yml",
                     "-i", "Api_watchdog/dynamic_inventory.py",
-                    "-e", f"target_ips={target_ips_str}",
                     "-e", f"flow_ids={flow_ids_str}",
                     "-e", f"access_token={self.access_token}",
-                    "-v",
+                    "--limit", ",".join(ips),  # Limitar execução aos hosts específicos
+                    "-vvvv",
                 ],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
@@ -178,6 +177,10 @@ class AnsibleWatchdog:
             
             if process.returncode == 0:
                 logging.info("Playbook executado com sucesso")
+                self.retry_attempt = 0
+                return True
+            elif process.returncode == 4:
+                logging.warning("Alguns hosts estão inacessíveis, mas o playbook continuou para os hosts acessíveis")
                 self.retry_attempt = 0
                 return True
             else:
