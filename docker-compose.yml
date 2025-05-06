@@ -5,38 +5,9 @@ services:
     build: .
     container_name: hips
     volumes:
-      - ./state:/app/state:rw
-      - ./logs:/app/logs:rw
-      - ./scripts:/app/scripts
-      - ./data:/app/data:rw
-      - ~/.ssh:/home/hids/.ssh:ro
-    environment:
-      - TZ=America/Sao_Paulo
-      - API_URL=http://164.72.15.30:5050
-      - API_USERNAME=hids
-      - API_PASSWORD=hids
-      - CHECK_INTERVAL=15
-      - LOG_LEVEL=INFO
-      - PRIVATE_KEY_FILE=/home/hids/.ssh/id_rsa
-    network_mode: "host"
-    restart: unless-stopped
-    user: hids
-    tty: true
-    stdin_open: true
-    command: python Api_watchdog/watchdog_service.py
-
-  ansible_watchdog:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: ansible_watchdog
-    volumes:
       - ./scripts:/app/scripts
       - ./ansible.cfg:/app/ansible.cfg
       - ./rules_playbook.yml:/app/rules_playbook.yml
-      - ./logs:/app/logs:rw
-      - ./state:/app/state:rw
-      - ./data:/app/data:rw
       - ~/.ssh:/home/hids/.ssh:ro
     network_mode: "host"
     restart: always
@@ -45,8 +16,4 @@ services:
       - API_USERNAME=hids
       - API_PASSWORD=hids
       - CHECK_INTERVAL=15
-      - LOG_LEVEL=INFO
-      - PRIVATE_KEY_FILE=/home/hids/.ssh/id_rsa
-    tty: true
-    stdin_open: true
     command: python Api_watchdog/watchdog_service.py
