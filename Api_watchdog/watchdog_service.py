@@ -181,8 +181,7 @@ class AnsibleWatchdog:
                     "-i", "Api_watchdog/dynamic_inventory.py",
                     "-e", f"flow_ids={flow_ids_str}",
                     "-e", f"access_token={self.access_token}",
-                    "--limit", ",".join(ips),  # Limitar execução aos hosts específicos
-                    "-vvvv",
+                    "-vvvv"
                 ],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,

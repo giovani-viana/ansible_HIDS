@@ -88,18 +88,14 @@ class DynamicInventory:
         hosts = self.get_ips_from_api()
         
         inventory = {
-            "all": {
-                "children": {
-                    "Mirai_Bots": {
-                        "hosts": {},
-                        "vars": {
-                            "ansible_user": "pi",
-                            "ansible_ssh_common_args": "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null",
-                            "ansible_ssh_private_key_file": "/home/hids/.ssh/id_rsa",
-                            "ansible_ssh_retries": 3,
-                            "ansible_ssh_timeout": 30
-                        }
-                    }
+            "Mirai_Bots": {
+                "hosts": {},
+                "vars": {
+                    "ansible_user": "pi",
+                    "ansible_ssh_common_args": "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null",
+                    "ansible_ssh_private_key_file": "/home/hids/.ssh/id_rsa",
+                    "ansible_ssh_retries": 3,
+                    "ansible_ssh_timeout": 30
                 }
             },
             "_meta": {
@@ -110,7 +106,7 @@ class DynamicInventory:
         # Adicionar hosts com suas variáveis específicas
         for ip in hosts:
             hostname = f"pi@{ip}"
-            inventory["all"]["children"]["Mirai_Bots"]["hosts"][hostname] = {}
+            inventory["Mirai_Bots"]["hosts"][hostname] = {}
             inventory["_meta"]["hostvars"][hostname] = {
                 "ansible_host": ip,
                 "ansible_user": "pi",
