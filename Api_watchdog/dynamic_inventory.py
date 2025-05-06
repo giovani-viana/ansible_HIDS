@@ -89,26 +89,14 @@ class DynamicInventory:
         
         inventory = {
             "Mirai_Bots": {
-                "hosts": {},
-                "vars": {
-                    "ansible_user": "pi",
-                    "ansible_ssh_common_args": "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null",
-                    "ansible_ssh_private_key_file": "/home/hids/.ssh/id_rsa",
-                    "ansible_ssh_retries": 3,
-                    "ansible_ssh_timeout": 30
-                }
+                "hosts": []
             }
         }
 
-        # Adicionar hosts com suas variáveis específicas
+        # Adicionar hosts à lista
         for ip in hosts:
             hostname = f"pi@{ip}"
-            inventory["Mirai_Bots"]["hosts"][hostname] = {
-                "ansible_host": ip,
-                "ansible_user": "pi",
-                "ansible_ssh_private_key_file": "/home/hids/.ssh/id_rsa",
-                "ansible_ssh_common_args": "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
-            }
+            inventory["Mirai_Bots"]["hosts"].append(hostname)
         
         return inventory
 
