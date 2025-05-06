@@ -38,6 +38,7 @@ class DynamicInventory:
 
     def get_ips_from_api(self):
         if not self.access_token and not self.get_token():
+            print("Erro: Não foi possível obter o token de autenticação.", file=sys.stderr)
             return []
 
         try:
@@ -47,29 +48,21 @@ class DynamicInventory:
                 headers=headers,
                 timeout=30
             )
-            
-            if response.status_code == 401:
-                if not self.get_token():
-                    return []
-                headers = {"Authorization": f"Bearer {self.access_token}"}
-                response = requests.get(
-                    f"{self.api_url}/dados/ataques/novos",
-                    headers=headers,
-                    timeout=30
-                )
-
             response.raise_for_status()
             ataques = response.json().get("dados", [])
             
             if not ataques:
+                print("Nenhum ataque detectado.", file=sys.stderr)
                 return []
 
             ips = []
             for ataque in ataques:
                 if len(ataque) > 1:
                     src_ip = ataque[1]
-                    if self.validate_ip(src_ip):
+                    if self.validate_ip(src_ip) and src_ip != "0.0.0.0":
                         ips.append(f"pi@{src_ip}")
+                    else:
+                        print(f"IP inválido detectado e ignorado: {src_ip}", file=sys.stderr)
             
             return ips
 
@@ -114,4 +107,4 @@ def main():
         sys.exit(1)
 
 if __name__ == "__main__":
-    main() 
+    main()

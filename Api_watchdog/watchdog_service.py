@@ -129,9 +129,11 @@ class AnsibleWatchdog:
                 if len(ataque) > 1:
                     flow_id = ataque[0]
                     src_ip = ataque[1]
-                    if self.validate_ip(src_ip):
+                    if self.validate_ip(src_ip) and src_ip != "0.0.0.0":
                         ips.add(f"pi@{src_ip}")
                         flow_ids.append(flow_id)
+                    else:
+                        logging.warning(f"IP inválido detectado e ignorado: {src_ip}")
             
             logging.info(f"Encontrados {len(ips)} IPs únicos de ataques")
             return ips, flow_ids
@@ -147,6 +149,7 @@ class AnsibleWatchdog:
         try:
             logging.info("Executando playbook Ansible...")
             flow_ids_str = ','.join(map(str, flow_ids))
+            target_ips_str = ','.join(ips)
             
             # Executando o playbook com saída em tempo real
             process = subprocess.Popen(
@@ -154,6 +157,7 @@ class AnsibleWatchdog:
                     "ansible-playbook",
                     "rules_playbook.yml",
                     "-i", "Api_watchdog/dynamic_inventory.py",
+                    "-e", f"target_ips={target_ips_str}",
                     "-e", f"flow_ids={flow_ids_str}",
                     "-e", f"access_token={self.access_token}",
                     "-vvvv",
@@ -197,9 +201,8 @@ class AnsibleWatchdog:
             try:
                 current_ips, flow_ids = self.get_ips_from_api()
                 
-                if current_ips is not None and current_ips != self.state_manager.last_ips:
-                    logging.info(f"Detectada mudança na lista de IPs")
-                    logging.info(f"IPs anteriores: {self.state_manager.last_ips}")
+                if current_ips is not None:
+                    logging.info(f"Detectada lista de IPs")
                     logging.info(f"Novos IPs: {current_ips}")
                     
                     if current_ips:
@@ -208,9 +211,9 @@ class AnsibleWatchdog:
                             logging.info("Mitigação aplicada com sucesso")
                         else:
                             logging.error("Falha ao aplicar mitigação")
-                
-                time.sleep(Config.CHECK_INTERVAL)
-                
+            
+                time.sleep(Config.CHECK_INTERVAL)  # Correctly indented hereVAL)  # Correctly indented here
+        
             except Exception as e:
                 logging.error(f"Erro no loop principal: {str(e)}")
                 delay = self.exponential_backoff()
