@@ -6,7 +6,7 @@ services:
     container_name: hips
     volumes:
       - ./state:/app/state
-      - ./logs:/app/logs
+      - ./logs:/app/logs:rw
       - ./scripts:/app/scripts
       - ~/.ssh:/home/hids/.ssh:ro
     environment:

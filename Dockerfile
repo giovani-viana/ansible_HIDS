@@ -7,7 +7,7 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Criar diretórios necessários
-RUN mkdir -p /app/state /app/logs /app/scripts
+RUN mkdir -p /app/state /app/logs /app/scripts && chmod 777 /app/logs
 
 # Copiar arquivos da aplicação
 COPY Api_watchdog /app/Api_watchdog
