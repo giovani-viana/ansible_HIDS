@@ -21,6 +21,9 @@ WORKDIR /app
 # Instalar dependências Python
 RUN pip install requests
 
+# Tornar o script de inventário dinâmico executável
+RUN chmod +x /app/Api_watchdog/dynamic_inventory.py
+
 # Criar usuário não-root
 RUN useradd -m -s /bin/bash hids
 RUN chown -R hids:hids /app

@@ -60,12 +60,13 @@
 
 - name: Aplicar regras de mitigação nos hosts do inventory
   hosts: Mirai_Bots
-  become: true
-  become_user: pi
+  gather_facts: false
   vars:
     script_to_run: "block_https"
     dry_run: false
     scripts_dir: "/app/scripts"
+    flow_ids: "{{ flow_ids }}"
+    access_token: "{{ access_token }}"
 
   tasks:
     - name: Testar conectividade SSH

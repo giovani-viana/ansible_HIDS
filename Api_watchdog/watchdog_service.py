@@ -146,7 +146,6 @@ class AnsibleWatchdog:
     def execute_ansible_playbook(self, ips, flow_ids):
         try:
             logging.info("Executando playbook Ansible...")
-            ips_str = ','.join(ips)
             flow_ids_str = ','.join(map(str, flow_ids))
             
             # Executando o playbook com saída em tempo real
@@ -154,7 +153,7 @@ class AnsibleWatchdog:
                 [
                     "ansible-playbook",
                     "rules_playbook.yml",
-                    "-e", f"target_ips={ips_str}",
+                    "-i", "Api_watchdog/dynamic_inventory.py",
                     "-e", f"flow_ids={flow_ids_str}",
                     "-e", f"access_token={self.access_token}",
                     "-vvvv",
