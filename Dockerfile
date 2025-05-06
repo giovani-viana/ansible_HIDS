@@ -7,7 +7,9 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Criar diretórios necessários
-RUN mkdir -p /app/state /app/logs /app/scripts && chmod 777 /app/logs
+RUN mkdir -p /app/state /app/logs /app/scripts && \
+    chmod 777 /app/logs && \
+    chmod 777 /app/state
 
 # Copiar arquivos da aplicação
 COPY Api_watchdog /app/Api_watchdog
@@ -25,13 +27,16 @@ RUN pip install requests
 RUN chmod +x /app/Api_watchdog/dynamic_inventory.py
 
 # Criar usuário não-root
-RUN useradd -m -s /bin/bash hids
-RUN chown -R hids:hids /app
+RUN useradd -m -s /bin/bash hids && \
+    chown -R hids:hids /app && \
+    chmod -R 755 /app && \
+    chmod -R 777 /app/logs && \
+    chmod -R 777 /app/state
 
 # Configurar SSH
-RUN mkdir -p /home/hids/.ssh
-RUN chown -R hids:hids /home/hids/.ssh
-RUN chmod 700 /home/hids/.ssh
+RUN mkdir -p /home/hids/.ssh && \
+    chown -R hids:hids /home/hids/.ssh && \
+    chmod 700 /home/hids/.ssh
 
 # Mudar para usuário não-root
 USER hids

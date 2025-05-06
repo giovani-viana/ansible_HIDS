@@ -5,7 +5,7 @@ services:
     build: .
     container_name: hips
     volumes:
-      - ./state:/app/state
+      - ./state:/app/state:rw
       - ./logs:/app/logs:rw
       - ./scripts:/app/scripts
       - ~/.ssh:/home/hids/.ssh:ro
@@ -26,6 +26,8 @@ services:
       - ./ansible.cfg:/app/ansible.cfg
       - ./inventory.ini:/app/inventory.ini
       - ./rules_playbook.yml:/app/rules_playbook.yml
+      - ./logs:/app/logs:rw
+      - ./state:/app/state:rw
     network_mode: "host"
     restart: always
     environment:
