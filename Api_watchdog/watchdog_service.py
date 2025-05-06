@@ -169,8 +169,9 @@ class AnsibleWatchdog:
 
             # Lendo e exibindo a saída em tempo real
             for line in process.stdout:
-                print(line, end='')
-                logging.info(line.strip())
+                if "extra_vars" not in line:  # Filtrar linhas que contêm "extra_vars"
+                    print(line, end='')
+                    logging.info(line.strip())
 
             # Aguardando o processo terminar
             process.wait()
