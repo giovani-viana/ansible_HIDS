@@ -8,7 +8,7 @@
     flow_ids: "{{ flow_ids }}"
     access_token: "{{ access_token }}"
     inventory_file: "inventory.ini"
-    scripts_dir: "/home/hids/ansible_HIPS/scripts"
+    scripts_dir: "/app/scripts"
 
   tasks:
     - name: Verificar variáveis obrigatórias
@@ -51,6 +51,7 @@
           {{ ip }}
           {% endfor %}
         dest: "{{ inventory_file }}"
+        unsafe_writes: true
       register: inventory_update
 
     - name: Debug atualização do inventory
@@ -64,7 +65,7 @@
   vars:
     script_to_run: "block_https"
     dry_run: false
-    scripts_dir: "/home/hids/ansible_HIPS/scripts"
+    scripts_dir: "/app/scripts"
 
   tasks:
     - name: Testar conectividade SSH
