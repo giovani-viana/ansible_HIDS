@@ -29,7 +29,7 @@ def run_ansible_playbook(vars_dict):
             "-e", f"target_ips={vars_dict['target_ips']}",
             "-e", f"flow_ids={vars_dict['flow_ids']}",
             "-e", f"access_token={vars_dict['access_token']}",
-            "-vvvv"
+            "-vvv"
         ]
         
         logging.info("Executando playbook Ansible...")

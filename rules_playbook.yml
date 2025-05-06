@@ -8,7 +8,7 @@
     flow_ids: "{{ flow_ids }}"
     access_token: "{{ access_token }}"
     inventory_file: "inventory.ini"
-    scripts_dir: "{{ playbook_dir }}/scripts"
+    scripts_dir: "/home/hids/ansible_HIPS/scripts"
 
   tasks:
     - name: Verificar variáveis obrigatórias
@@ -64,7 +64,7 @@
   vars:
     script_to_run: "block_https"
     dry_run: false
-    scripts_dir: "{{ playbook_dir }}/scripts"
+    scripts_dir: "/home/hids/ansible_HIPS/scripts"
 
   tasks:
     - name: Testar conectividade SSH
@@ -81,34 +81,40 @@
         msg: "Não foi possível estabelecer conexão com o host {{ inventory_hostname }}"
       when: ping_result is failed
 
-    - name: Verificar existência do script block_https.sh
+    - name: Copiar script para o host remoto
+      copy:
+        src: "{{ scripts_dir }}/{{ script_to_run }}.sh"
+        dest: "/tmp/{{ script_to_run }}.sh"
+        mode: '0755'
+
+    - name: Verificar existência do script no host remoto
       stat:
-        path: "{{ scripts_dir }}/block_https.sh"
+        path: "/tmp/{{ script_to_run }}.sh"
       register: block_https_stat
 
-    - name: Debug stat do script block_https.sh
+    - name: Debug stat do script no host remoto
       debug:
         var: block_https_stat
 
-    - name: Falhar se script não existir
+    - name: Falhar se script não existir no host remoto
       fail:
-        msg: "Script block_https.sh não encontrado em {{ scripts_dir }}"
+        msg: "Script {{ script_to_run }}.sh não encontrado em /tmp/"
       when: not block_https_stat.stat.exists
 
-    - name: Block HTTPS
-      script: "{{ scripts_dir }}/block_https.sh"
-      register: resultado_block_https
-      when: script_to_run == "block_https" and not dry_run
-      ignore_errors: true
+    - name: Executar script no host remoto
+      shell: "/tmp/{{ script_to_run }}.sh"
+      become: true
+      become_user: root
+      register: script_output
 
-    - name: Resultado do script Block HTTPS
+    - name: Resultado do script
       debug:
-        var: resultado_block_https
+        var: script_output
 
     - name: Falhar se script retornou erro
       fail:
-        msg: "Erro ao executar script block_https.sh no host {{ inventory_hostname }}"
-      when: resultado_block_https is failed
+        msg: "Erro ao executar script {{ script_to_run }}.sh no host {{ inventory_hostname }}"
+      when: script_output.rc != 0
 
     - name: Log de execução
       debug:
