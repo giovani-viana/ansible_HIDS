@@ -26,7 +26,6 @@ services:
     volumes:
       - ./scripts:/app/scripts
       - ./ansible.cfg:/app/ansible.cfg
-      - ./inventory.ini:/app/inventory.ini
       - ./rules_playbook.yml:/app/rules_playbook.yml
       - ./logs:/app/logs:rw
       - ./state:/app/state:rw

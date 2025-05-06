@@ -14,7 +14,6 @@ RUN mkdir -p /app/state /app/logs /app/scripts && \
 # Copiar arquivos da aplicação
 COPY Api_watchdog /app/Api_watchdog
 COPY rules_playbook.yml /app/
-COPY run_ansible.py /app/
 COPY scripts /app/scripts/
 
 # Configurar diretório de trabalho
