@@ -10,6 +10,7 @@ import json
 import hashlib
 from pathlib import Path
 from config import Config
+import sys
 
 class StateManager:
     def __init__(self, state_file):
@@ -45,30 +46,27 @@ class AnsibleWatchdog:
         self.retry_attempt = 0
         
     def setup_logging(self):
+        """Configura o sistema de logging"""
         try:
             # Criar diretório de logs se não existir
-            log_dir = os.path.dirname(Config.LOG_FILE)
-            os.makedirs(log_dir, exist_ok=True)
+            os.makedirs(Config.LOG_DIR, exist_ok=True)
             
-            # Garantir permissões do diretório
-            os.chmod(log_dir, 0o777)
+            # Configurar o logger
+            logger = logging.getLogger()
+            logger.setLevel(logging.INFO)
             
-            # Criar arquivo de log se não existir
-            if not os.path.exists(Config.LOG_FILE):
-                open(Config.LOG_FILE, 'a').close()
-                os.chmod(Config.LOG_FILE, 0o666)
+            # Configurar formato do log
+            formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
             
-            handler = RotatingFileHandler(
-                Config.LOG_FILE,
-                maxBytes=Config.LOG_MAX_SIZE,
-                backupCount=Config.LOG_BACKUP_COUNT
-            )
+            # Configurar handler para arquivo
+            file_handler = logging.FileHandler(Config.LOG_FILE)
+            file_handler.setFormatter(formatter)
+            logger.addHandler(file_handler)
             
-            logging.basicConfig(
-                level=getattr(logging, Config.LOG_LEVEL),
-                format=Config.LOG_FORMAT,
-                handlers=[handler, logging.StreamHandler()]
-            )
+            # Configurar handler para console
+            console_handler = logging.StreamHandler()
+            console_handler.setFormatter(formatter)
+            logger.addHandler(console_handler)
             
             logging.info("Sistema de logging configurado com sucesso")
             
@@ -76,9 +74,9 @@ class AnsibleWatchdog:
             print(f"Erro ao configurar logging: {str(e)}")
             # Configurar logging básico para stdout em caso de erro
             logging.basicConfig(
-                level=getattr(logging, Config.LOG_LEVEL),
-                format=Config.LOG_FORMAT,
-                handlers=[logging.StreamHandler()]
+                level=logging.INFO,
+                format='%(asctime)s - %(levelname)s - %(message)s',
+                stream=sys.stdout
             )
             logging.error(f"Erro ao configurar logging: {str(e)}")
         

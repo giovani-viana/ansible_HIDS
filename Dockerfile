@@ -6,15 +6,20 @@ RUN apt-get update && apt-get install -y \
     ansible \
     && rm -rf /var/lib/apt/lists/*
 
-# Criar diretórios necessários
+# Criar usuário não-root
+RUN useradd -m -s /bin/bash hids
+
+# Criar diretórios necessários e configurar permissões
 RUN mkdir -p /app/state /app/logs /app/scripts && \
+    chown -R hids:hids /app && \
+    chmod -R 755 /app && \
     chmod -R 777 /app/logs && \
     chmod -R 777 /app/state
 
 # Copiar arquivos da aplicação
-COPY Api_watchdog /app/Api_watchdog
-COPY rules_playbook.yml /app/
-COPY scripts /app/scripts/
+COPY --chown=hids:hids Api_watchdog /app/Api_watchdog
+COPY --chown=hids:hids rules_playbook.yml /app/
+COPY --chown=hids:hids scripts /app/scripts/
 
 # Configurar diretório de trabalho
 WORKDIR /app
@@ -24,16 +29,6 @@ RUN pip install requests
 
 # Tornar o script de inventário dinâmico executável
 RUN chmod +x /app/Api_watchdog/dynamic_inventory.py
-
-# Criar usuário não-root e configurar permissões
-RUN useradd -m -s /bin/bash hids && \
-    chown -R hids:hids /app && \
-    chmod -R 755 /app && \
-    chmod -R 777 /app/logs && \
-    chmod -R 777 /app/state && \
-    touch /app/logs/watchdog.log && \
-    chown hids:hids /app/logs/watchdog.log && \
-    chmod 666 /app/logs/watchdog.log
 
 # Configurar SSH
 RUN mkdir -p /home/hids/.ssh && \
