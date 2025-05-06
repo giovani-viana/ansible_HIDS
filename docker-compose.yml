@@ -15,6 +15,8 @@ services:
     user: hids
     tty: true
     stdin_open: true
+    command: >
+      bash -c "mkdir -p /app/logs && chmod 777 /app/logs && touch /app/logs/watchdog.log && chmod 666 /app/logs/watchdog.log && python Api_watchdog/watchdog_service.py"
 
   ansible_watchdog:
     build:
@@ -37,3 +39,5 @@ services:
       - CHECK_INTERVAL=15
     tty: true
     stdin_open: true
+    command: >
+      bash -c "mkdir -p /app/logs && chmod 777 /app/logs && touch /app/logs/watchdog.log && chmod 666 /app/logs/watchdog.log && python Api_watchdog/watchdog_service.py"

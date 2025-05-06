@@ -45,17 +45,42 @@ class AnsibleWatchdog:
         self.retry_attempt = 0
         
     def setup_logging(self):
-        os.makedirs(os.path.dirname(Config.LOG_FILE), exist_ok=True)
-        handler = RotatingFileHandler(
-            Config.LOG_FILE,
-            maxBytes=Config.LOG_MAX_SIZE,
-            backupCount=Config.LOG_BACKUP_COUNT
-        )
-        logging.basicConfig(
-            level=getattr(logging, Config.LOG_LEVEL),
-            format=Config.LOG_FORMAT,
-            handlers=[handler, logging.StreamHandler()]
-        )
+        try:
+            # Criar diretório de logs se não existir
+            log_dir = os.path.dirname(Config.LOG_FILE)
+            os.makedirs(log_dir, exist_ok=True)
+            
+            # Garantir permissões do diretório
+            os.chmod(log_dir, 0o777)
+            
+            # Criar arquivo de log se não existir
+            if not os.path.exists(Config.LOG_FILE):
+                open(Config.LOG_FILE, 'a').close()
+                os.chmod(Config.LOG_FILE, 0o666)
+            
+            handler = RotatingFileHandler(
+                Config.LOG_FILE,
+                maxBytes=Config.LOG_MAX_SIZE,
+                backupCount=Config.LOG_BACKUP_COUNT
+            )
+            
+            logging.basicConfig(
+                level=getattr(logging, Config.LOG_LEVEL),
+                format=Config.LOG_FORMAT,
+                handlers=[handler, logging.StreamHandler()]
+            )
+            
+            logging.info("Sistema de logging configurado com sucesso")
+            
+        except Exception as e:
+            print(f"Erro ao configurar logging: {str(e)}")
+            # Configurar logging básico para stdout em caso de erro
+            logging.basicConfig(
+                level=getattr(logging, Config.LOG_LEVEL),
+                format=Config.LOG_FORMAT,
+                handlers=[logging.StreamHandler()]
+            )
+            logging.error(f"Erro ao configurar logging: {str(e)}")
         
     def get_token(self):
         if (self.access_token and self.token_expiration and 

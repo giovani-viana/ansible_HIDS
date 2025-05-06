@@ -8,8 +8,8 @@ RUN apt-get update && apt-get install -y \
 
 # Criar diretórios necessários
 RUN mkdir -p /app/state /app/logs /app/scripts && \
-    chmod 777 /app/logs && \
-    chmod 777 /app/state
+    chmod -R 777 /app/logs && \
+    chmod -R 777 /app/state
 
 # Copiar arquivos da aplicação
 COPY Api_watchdog /app/Api_watchdog
@@ -26,12 +26,15 @@ RUN pip install requests
 # Tornar o script de inventário dinâmico executável
 RUN chmod +x /app/Api_watchdog/dynamic_inventory.py
 
-# Criar usuário não-root
+# Criar usuário não-root e configurar permissões
 RUN useradd -m -s /bin/bash hids && \
     chown -R hids:hids /app && \
     chmod -R 755 /app && \
     chmod -R 777 /app/logs && \
-    chmod -R 777 /app/state
+    chmod -R 777 /app/state && \
+    touch /app/logs/watchdog.log && \
+    chown hids:hids /app/logs/watchdog.log && \
+    chmod 666 /app/logs/watchdog.log
 
 # Configurar SSH
 RUN mkdir -p /home/hids/.ssh && \
