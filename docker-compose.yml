@@ -13,6 +13,8 @@ services:
       - TZ=America/Sao_Paulo
     restart: unless-stopped
     user: hids
+    tty: true
+    stdin_open: true
 
   ansible_watchdog:
     build:
@@ -31,3 +33,5 @@ services:
       - API_USERNAME=hids
       - API_PASSWORD=hids
       - CHECK_INTERVAL=15
+    tty: true
+    stdin_open: true

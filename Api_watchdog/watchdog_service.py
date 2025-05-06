@@ -149,7 +149,8 @@ class AnsibleWatchdog:
             ips_str = ','.join(ips)
             flow_ids_str = ','.join(map(str, flow_ids))
             
-            result = subprocess.run(
+            # Executando o playbook com saída em tempo real
+            process = subprocess.Popen(
                 [
                     "ansible-playbook",
                     "rules_playbook.yml",
@@ -158,20 +159,28 @@ class AnsibleWatchdog:
                     "-e", f"access_token={self.access_token}",
                     "-vvvv",
                 ],
-                capture_output=True,
-                text=True,
-                check=True
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                universal_newlines=True,
+                bufsize=1
             )
-            logging.info("Playbook executado com sucesso")
-            logging.info(f"STDOUT do playbook:\n{result.stdout}")
-            if result.stderr:
-                logging.warning(f"STDERR do playbook:\n{result.stderr}")
-            self.retry_attempt = 0
-            return True
+
+            # Lendo e exibindo a saída em tempo real
+            for line in process.stdout:
+                print(line, end='')
+                logging.info(line.strip())
+
+            # Aguardando o processo terminar
+            process.wait()
             
-        except subprocess.CalledProcessError as e:
-            logging.error(f"Erro na execução do playbook: {e.stderr}")
-            return False
+            if process.returncode == 0:
+                logging.info("Playbook executado com sucesso")
+                self.retry_attempt = 0
+                return True
+            else:
+                logging.error(f"Playbook falhou com código de retorno {process.returncode}")
+                return False
+            
         except Exception as e:
             logging.error(f"Erro inesperado: {str(e)}")
             return False
