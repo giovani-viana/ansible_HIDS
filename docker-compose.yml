@@ -28,6 +28,7 @@ services:
       - ./rules_playbook.yml:/app/rules_playbook.yml
       - ./logs:/app/logs:rw
       - ./state:/app/state:rw
+      - ~/.ssh:/home/hids/.ssh:ro
     network_mode: "host"
     restart: always
     environment:
