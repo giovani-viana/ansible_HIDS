@@ -160,7 +160,7 @@ class AnsibleWatchdog:
                     "-e", f"target_ips={target_ips_str}",
                     "-e", f"flow_ids={flow_ids_str}",
                     "-e", f"access_token={self.access_token}",
-                    "-vvvv",
+                    "-v",
                 ],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
