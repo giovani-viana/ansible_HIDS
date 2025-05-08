@@ -1,0 +1,15 @@
+---
+all:
+  hosts:
+    164.72.15.11:
+      ansible_user: pi
+    164.72.15.10:
+      ansible_user: pi
+    164.72.15.13:
+      ansible_user: pi
+  children:
+    Mirai_Bots:
+      hosts:
+        164.72.15.11:
+        164.72.15.10:
+        164.72.15.13:
