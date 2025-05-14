@@ -109,7 +109,7 @@ class AnsibleWatchdog:
 
     def mark_attack_as_resolved(self, flow_id):
         try:
-            api_url = f"http://localhost:5000/dados/ataques/processar/{flow_id}"
+            api_url = f"http://164.72.15.30:5050/dados/ataques/processar/{flow_id}"
             response = requests.put(api_url)
 
             if response.status_code == 200:
