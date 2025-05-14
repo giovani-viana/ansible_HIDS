@@ -122,22 +122,24 @@ class AnsibleWatchdog:
 
     def run(self):
         print("Iniciando serviço de monitoramento...")
-        
+
         while True:
             try:
                 ips = self.get_ips_from_api()
-                
+
                 if ips:
                     print(f"Novos IPs detectados: {ips}")
                     for ip, flow_id in ips:
                         print(f"Processando IP: {ip} com flow_id: {flow_id}")
                         if self.execute_ansible_playbook(flow_id):
                             print("Mitigação aplicada com sucesso")
+                            # Marcar o ataque como processado somente após sucesso
+                            self.mark_attack_as_resolved(flow_id)
                         else:
                             print("Falha ao aplicar mitigação")
-                
+
                 time.sleep(self.check_interval)
-        
+
             except Exception as e:
                 print(f"Erro no loop principal: {str(e)}")
                 time.sleep(self.check_interval)
