@@ -72,7 +72,7 @@ class AnsibleWatchdog:
                 if len(ataque) > 1:
                     src_ip = ataque[1]
                     if src_ip != "0.0.0.0":
-                        ips.append(src_ip)
+                        ips.append((src_ip, ataque[0]))  # Include flow_id
             
             print(f"Encontrados {len(ips)} IPs de ataques")
             return ips
@@ -81,7 +81,7 @@ class AnsibleWatchdog:
             print(f"Erro ao obter IPs: {str(e)}")
             return []
 
-    def execute_ansible_playbook(self):
+    def execute_ansible_playbook(self, flow_id):
         try:
             print("Executando playbook Ansible...")
             process = subprocess.run(
@@ -93,16 +93,32 @@ class AnsibleWatchdog:
                 capture_output=True,
                 text=True
             )
-            
+
             print(process.stdout)
             if process.stderr:
                 print(f"Erro: {process.stderr}")
-            
+
+            if process.returncode == 0:
+                self.mark_attack_as_resolved(flow_id)
+
             return process.returncode == 0
-            
+
         except Exception as e:
             print(f"Erro ao executar playbook: {str(e)}")
             return False
+
+    def mark_attack_as_resolved(self, flow_id):
+        try:
+            api_url = f"http://localhost:5000/dados/ataques/processar/{flow_id}"
+            response = requests.put(api_url)
+
+            if response.status_code == 200:
+                print(f"Ataque {flow_id} marcado como processado com sucesso!")
+            else:
+                print(f"Falha ao marcar ataque {flow_id} como processado. Status: {response.status_code}")
+
+        except Exception as e:
+            print(f"Erro ao marcar ataque como processado: {str(e)}")
 
     def run(self):
         print("Iniciando serviço de monitoramento...")
@@ -113,10 +129,12 @@ class AnsibleWatchdog:
                 
                 if ips:
                     print(f"Novos IPs detectados: {ips}")
-                    if self.execute_ansible_playbook():
-                        print("Mitigação aplicada com sucesso")
-                    else:
-                        print("Falha ao aplicar mitigação")
+                    for ip, flow_id in ips:
+                        print(f"Processando IP: {ip} com flow_id: {flow_id}")
+                        if self.execute_ansible_playbook(flow_id):
+                            print("Mitigação aplicada com sucesso")
+                        else:
+                            print("Falha ao aplicar mitigação")
                 
                 time.sleep(self.check_interval)
         
