@@ -79,6 +79,50 @@ class AnsibleWatchdog:
                 
         return None
 
+    def get_ips_from_api(self):
+        """Obtém os IPs de ataques da API"""
+        if not self.access_token and not self.get_token():
+            return []
+
+        try:
+            headers = {"Authorization": f"Bearer {self.access_token}"}
+            response = requests.get(
+                f"{self.api_url}/dados/ataques/novos",
+                headers=headers,
+                timeout=30
+            )
+
+            if response.status_code == 401:
+                if not self.get_token():
+                    return []
+                headers = {"Authorization": f"Bearer {self.access_token}"}
+                response = requests.get(
+                    f"{self.api_url}/dados/ataques/novos",
+                    headers=headers,
+                    timeout=30
+                )
+
+            response.raise_for_status()
+            ataques = response.json().get("dados", [])
+
+            if not ataques:
+                print("Nenhum novo ataque detectado")
+                return []
+
+            ips = []
+            for ataque in ataques:
+                if len(ataque) > 1:
+                    src_ip = ataque[1]
+                    if src_ip != "0.0.0.0":
+                        ips.append((src_ip, ataque[0]))  # Inclui flow_id
+
+            print(f"Encontrados {len(ips)} IPs de ataques")
+            return ips
+
+        except Exception as e:
+            print(f"Erro ao obter IPs: {str(e)}")
+            return []
+
     def mark_attack_as_resolved(self, flow_id):
         """Marca ataque como processado com tratamento robusto"""
         for attempt in range(self.max_retries):
