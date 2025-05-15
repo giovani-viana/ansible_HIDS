@@ -208,8 +208,22 @@ class AnsibleWatchdog:
 
                 if ips:
                     print(f"Novos IPs detectados: {ips}")
+                    ip_to_flowids = {}
                     for ip, flow_id in ips:
-                        self.process_attack(ip, flow_id)
+                        if ip not in ip_to_flowids:
+                            ip_to_flowids[ip] = []
+                        ip_to_flowids[ip].append(flow_id)
+
+                    for ip, flow_ids in ip_to_flowids.items():
+                        print(f"Processando IP: {ip} com flow_ids: {flow_ids}")
+                        # Executa mitigação uma vez por IP
+                        if self.execute_ansible_playbook(flow_ids[0]):
+                            print("Mitigação aplicada com sucesso para o IP", ip)
+                            # Marca todos os flow_ids desse IP como resolvidos
+                            for flow_id in flow_ids:
+                                self.mark_attack_as_resolved(flow_id)
+                        else:
+                            print(f"Falha ao aplicar mitigação para o IP {ip}")
 
                 time.sleep(self.check_interval)
 
