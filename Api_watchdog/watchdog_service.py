@@ -1,213 +1,126 @@
 #!/usr/bin/env python3
-import requests
 import time
 import subprocess
+import logging
+from datetime import datetime
+from .auth import APIAuthentication
+from .config import Config
 import os
-from datetime import datetime, timedelta
 
-class AnsibleWatchdog:
+class AnsibleWatchdog(APIAuthentication):
     def __init__(self):
-        self.api_url = os.getenv('API_URL', 'http://164.72.15.30:5050')
-        self.api_username = os.getenv('API_USERNAME', 'hids')
-        self.api_password = os.getenv('API_PASSWORD', 'hids')
-        self.access_token = None
-        self.token_expiration = None
-        self.check_interval = int(os.getenv('CHECK_INTERVAL', '15'))
-        self.max_retries = 3  # Número máximo de tentativas
-        self.retry_delay = 5  # Segundos entre tentativas
+        super().__init__()
+        self.config = Config()
+        self.setup_logging()
+        self.logger.info("Iniciando validação de ambiente...")
+        self._validate_scripts()
+        self.logger.info("Ambiente validado com sucesso")
 
-    def get_token(self):
-        """Obtém token de autenticação com tratamento robusto de erros"""
-        try:
-            # Se temos um token válido, retorna True
-            if (self.access_token and self.token_expiration and 
-                datetime.now() < self.token_expiration - timedelta(minutes=5)):
-                return True
-                
-            response = requests.post(
-                f"{self.api_url}/token",
-                data={
-                    "username": self.api_username,
-                    "password": self.api_password,
-                    "grant_type": "password"
-                },
-                timeout=10
-            )
-            response.raise_for_status()
-            
-            token_data = response.json()
-            self.access_token = token_data["access_token"]
-            self.token_expiration = datetime.now() + timedelta(seconds=token_data.get("expires_in", 1800))
-            print("Token obtido com sucesso")
-            return True
-            
-        except requests.exceptions.RequestException as e:
-            print(f"Erro ao obter token: {str(e)}")
-            self.access_token = None
-            self.token_expiration = None
-            return False
-
-    def make_authenticated_request(self, method, endpoint, **kwargs):
-        """Faz requisições autenticadas com tratamento de token expirado"""
-        for attempt in range(self.max_retries):
-            if not self.get_token():
-                print("Falha ao obter token de autenticação")
-                return None
-                
-            headers = kwargs.get('headers', {})
-            headers.update({"Authorization": f"Bearer {self.access_token}"})
-            kwargs['headers'] = headers
-            
-            try:
-                response = requests.request(
-                    method,
-                    f"{self.api_url}{endpoint}",
-                    **kwargs
-                )
-                
-                # Se token expirou, tentamos renovar uma vez
-                if response.status_code == 401 and attempt == 0:
-                    print("Token expirado, tentando renovar...")
-                    self.access_token = None
-                    continue
-                    
-                return response
-                
-            except requests.exceptions.RequestException as e:
-                print(f"Erro na requisição (tentativa {attempt + 1}): {str(e)}")
-                time.sleep(self.retry_delay)
-                
-        return None
+    def setup_logging(self):
+        """Configura o sistema de logging"""
+        logging.basicConfig(
+            level=self.config.LOG_LEVEL,
+            format=self.config.LOG_FORMAT,
+            filename=self.config.LOG_FILE
+        )
+        self.logger = logging.getLogger(__name__)
 
     def get_ips_from_api(self):
         """Obtém os IPs de ataques da API"""
-        if not self.access_token and not self.get_token():
+        response = self.make_authenticated_request(
+            'GET',
+            '/dados/ataques/novos',
+            timeout=30
+        )
+        
+        if not response or response.status_code != 200:
             return []
 
-        try:
-            headers = {"Authorization": f"Bearer {self.access_token}"}
-            response = requests.get(
-                f"{self.api_url}/dados/ataques/novos",
-                headers=headers,
-                timeout=30
-            )
-
-            if response.status_code == 401:
-                if not self.get_token():
-                    return []
-                headers = {"Authorization": f"Bearer {self.access_token}"}
-                response = requests.get(
-                    f"{self.api_url}/dados/ataques/novos",
-                    headers=headers,
-                    timeout=30
-                )
-
-            response.raise_for_status()
-            ataques = response.json().get("dados", [])
-
-            if not ataques:
-                print("Nenhum novo ataque detectado")
-                return []
-
-            ips = []
-            for ataque in ataques:
-                if len(ataque) > 1:
-                    src_ip = ataque[1]
-                    if src_ip != "0.0.0.0":
-                        ips.append((src_ip, ataque[0]))  # Inclui flow_id
-
-            print(f"Encontrados {len(ips)} IPs de ataques")
-            return ips
-
-        except Exception as e:
-            print(f"Erro ao obter IPs: {str(e)}")
+        ataques = response.json().get("dados", [])
+        
+        if not ataques:
+            self.logger.info("Nenhum novo ataque detectado")
             return []
 
-    def mark_attack_as_resolved(self, flow_id):
-        """Marca ataque como processado com tratamento robusto"""
-        for attempt in range(self.max_retries):
-            print(f"Tentando marcar ataque {flow_id} como processado (tentativa {attempt + 1})")
-            
-            response = self.make_authenticated_request(
-                'PUT',
-                f"/dados/ataques/processar/{flow_id}"
-            )
-            
-            if response is None:
-                print("Falha na comunicação com a API")
-                continue
-                
-            if response.status_code == 200:
-                print(f"Ataque {flow_id} marcado como processado com sucesso!")
-                return True
-            elif response.status_code == 403:
-                print(f"Permissão negada para marcar ataque {flow_id}. Verifique credenciais.")
-                return False
-            else:
-                print(f"Resposta inesperada ao marcar ataque {flow_id}. Status: {response.status_code}")
-                
-            time.sleep(self.retry_delay)
-            
-        print(f"Falha ao marcar ataque {flow_id} como processado após {self.max_retries} tentativas")
-        return False
+        ips = []
+        for ataque in ataques:
+            if len(ataque) > 1:
+                src_ip = ataque[1]
+                if src_ip != "0.0.0.0":
+                    ips.append((src_ip, ataque[0]))  # Inclui flow_id
+
+        self.logger.info(f"Encontrados {len(ips)} IPs de ataques")
+        return ips
 
     def execute_ansible_playbook(self, flow_id):
         """Executa playbook ansible com melhor tratamento de erros"""
         try:
-            print("Executando playbook Ansible...")
+            self.logger.info("Executando playbook Ansible...")
             process = subprocess.run(
                 [
                     "ansible-playbook",
-                    "rules_playbook.yml",
-                    "-i", "Api_watchdog/dynamic_inventory.py"
+                    self.config.ANSIBLE_PLAYBOOK_PATH,
+                    "-i", self.config.ANSIBLE_INVENTORY_PATH
                 ],
                 capture_output=True,
                 text=True,
-                timeout=300  # 5 minutos de timeout
+                timeout=self.config.ANSIBLE_TIMEOUT
             )
 
             if process.stdout:
-                print("Saída do Ansible:\n" + process.stdout)
+                self.logger.info("Saída do Ansible:\n" + process.stdout)
             if process.stderr:
-                print("Erros do Ansible:\n" + process.stderr)
+                self.logger.error("Erros do Ansible:\n" + process.stderr)
 
             return process.returncode == 0
 
         except subprocess.TimeoutExpired:
-            print("Playbook Ansible excedeu o tempo limite")
+            self.logger.error("Playbook Ansible excedeu o tempo limite")
             return False
         except Exception as e:
-            print(f"Erro inesperado ao executar playbook: {str(e)}")
+            self.logger.error(f"Erro inesperado ao executar playbook: {str(e)}")
             return False
 
-    def process_attack(self, ip, flow_id):
-        """Processa um ataque individual com fluxo melhorado"""
-        print(f"Processando IP: {ip} com flow_id: {flow_id}")
+    def mark_attack_as_resolved(self, flow_id):
+        """Marca ataque como processado"""
+        response = self.make_authenticated_request(
+            'PUT',
+            f"/dados/ataques/processar/{flow_id}"
+        )
         
-        # Primeiro aplica a mitigação
+        if response and response.status_code == 200:
+            self.logger.info(f"Ataque {flow_id} marcado como processado com sucesso!")
+            return True
+            
+        self.logger.error(f"Falha ao marcar ataque {flow_id} como processado")
+        return False
+
+    def process_attack(self, ip, flow_id):
+        """Processa um ataque individual"""
+        self.logger.info(f"Processando IP: {ip} com flow_id: {flow_id}")
+        
         if not self.execute_ansible_playbook(flow_id):
-            print("Falha ao aplicar mitigação")
+            self.logger.error("Falha ao aplicar mitigação")
             return False
             
-        print("Mitigação aplicada com sucesso")
+        self.logger.info("Mitigação aplicada com sucesso")
         
-        # Só marca como resolvido se a mitigação foi bem-sucedida
         if self.mark_attack_as_resolved(flow_id):
             return True
             
-        print("Mitigação aplicada mas falha ao marcar como resolvido")
+        self.logger.warning("Mitigação aplicada mas falha ao marcar como resolvido")
         return False
 
     def run(self):
-        """Loop principal com tratamento de erros robusto"""
-        print("Iniciando serviço de monitoramento...")
+        """Loop principal do serviço"""
+        self.logger.info("Iniciando serviço de monitoramento...")
 
         while True:
             try:
                 ips = self.get_ips_from_api()
 
                 if ips:
-                    print(f"Novos IPs detectados: {ips}")
+                    self.logger.info(f"Novos IPs detectados: {ips}")
                     ip_to_flowids = {}
                     for ip, flow_id in ips:
                         if ip not in ip_to_flowids:
@@ -215,21 +128,42 @@ class AnsibleWatchdog:
                         ip_to_flowids[ip].append(flow_id)
 
                     for ip, flow_ids in ip_to_flowids.items():
-                        print(f"Processando IP: {ip} com flow_ids: {flow_ids}")
-                        # Executa mitigação uma vez por IP
+                        self.logger.info(f"Processando IP: {ip} com flow_ids: {flow_ids}")
                         if self.execute_ansible_playbook(flow_ids[0]):
-                            print("Mitigação aplicada com sucesso para o IP", ip)
-                            # Marca todos os flow_ids desse IP como resolvidos
+                            self.logger.info(f"Mitigação aplicada com sucesso para o IP {ip}")
                             for flow_id in flow_ids:
                                 self.mark_attack_as_resolved(flow_id)
                         else:
-                            print(f"Falha ao aplicar mitigação para o IP {ip}")
+                            self.logger.error(f"Falha ao aplicar mitigação para o IP {ip}")
 
-                time.sleep(self.check_interval)
+                time.sleep(self.config.CHECK_INTERVAL)
 
             except Exception as e:
-                print(f"Erro crítico no loop principal: {str(e)}")
-                time.sleep(self.check_interval * 2)  # Espera mais tempo após erro crítico
+                self.logger.error(f"Erro crítico no loop principal: {str(e)}")
+                time.sleep(self.config.CHECK_INTERVAL * 2)
+
+    def _validate_environment(self):
+        """Validação completa do ambiente"""
+        required_files = [
+            self.config.ANSIBLE_INVENTORY_PATH,
+            self.config.ANSIBLE_PLAYBOOK_PATH
+        ]
+        required_scripts = [
+            'block_https.sh',
+            'restore_https.sh',
+            'reset_iptables.sh'
+        ]
+        
+        for file in required_files:
+            if not os.path.exists(file):
+                raise FileNotFoundError(f"Arquivo necessário não encontrado: {file}")
+            
+        for script in required_scripts:
+            script_path = os.path.join(self.config.BASE_DIR, 'scripts', script)
+            if not os.path.exists(script_path):
+                raise FileNotFoundError(f"Script necessário não encontrado: {script}")
+            if not os.access(script_path, os.X_OK):
+                raise PermissionError(f"Script não tem permissão de execução: {script}")
 
 if __name__ == "__main__":
     watchdog = AnsibleWatchdog()
