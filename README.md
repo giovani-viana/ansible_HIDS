@@ -1,147 +1,204 @@
-# Sistema de Monitoramento e Mitigação com Ansible (HIPS)
+# 🛡️ Sistema de Mitigação de Ataques HIPS
 
-Este é um sistema de monitoramento que utiliza Ansible para aplicar regras de mitigação baseadas em IPs obtidos de uma API.
+Sistema automatizado de mitigação de ataques utilizando Ansible para gerenciar regras de firewall em dispositivos IoT.
 
-## Pré-requisitos
+## 📋 Índice
 
-- Docker e Docker Compose instalados
-- Git instalado
-- Acesso à API de monitoramento
+- [Visão Geral](#visão-geral)
+- [Estrutura do Projeto](#estrutura-do-projeto)
+- [Requisitos](#requisitos)
+- [Instalação](#instalação)
+- [Configuração](#configuração)
+- [Uso](#uso)
+- [Monitoramento](#monitoramento)
+- [Solução de Problemas](#solução-de-problemas)
+- [Segurança](#segurança)
 
-## Estrutura do Projeto
+## 🎯 Visão Geral
 
+Este sistema monitora continuamente uma API de detecção de ataques e, quando detecta um ataque, aplica automaticamente regras de mitigação nos dispositivos IoT afetados utilizando Ansible. O sistema é containerizado e pode ser facilmente implantado em qualquer ambiente que suporte Docker.
+
+## 🗂️ Estrutura do Projeto
+
+```text
 ansible_HIPS/
 ├── Api_watchdog/
-│ ├── watchdog_service.py
-│ └── ansible-watchdog.service
+│   ├── __init__.py
+│   ├── auth.py
+│   ├── config.py
+│   ├── dynamic_inventory.py
+│   └── watchdog_service.py
 ├── scripts/
-│ ├── block_https.sh
-│ └── limit_https.sh
+│   ├── block_https.sh
+│   ├── limit_https.sh
+│   ├── reset_iptables.sh
+│   └── restore_https.sh
 ├── ansible.cfg
 ├── docker-compose.yml
 ├── Dockerfile
-├── inventory.ini
-├── requirements.txt
-└── rules_playbook.yml
+├── rules_playbook.yml
+└── .env.example
+```
 
-## Instalação e Configuração
+## 🔧 Requisitos
 
-1. **Clone o repositório**
+- Docker e Docker Compose
+- Python 3.9+
+- Acesso SSH aos dispositivos IoT
+- Chave SSH para autenticação nos dispositivos
+
+## 🚀 Instalação e Início Rápido
+
+1. **Clone o repositório:**
    ```bash
-   git clone [URL_DO_REPOSITORIO]
+   git clone https://seu-repositorio/ansible_HIPS.git
    cd ansible_HIPS
    ```
 
-2. **Configure o arquivo de ambiente**
-   
-   Crie um arquivo `requirements.txt` com as dependências Python:
-   ```
-   requests>=2.25.1
+2. **Crie o arquivo `.env` com base no exemplo:**
+   ```bash
+   cp .env.example .env
    ```
 
-3. **Configure a URL da API**
-   
-   Edite o arquivo `docker-compose.yml` e atualize a variável de ambiente:
-   ```yaml
-   environment:
-     - API_URL=http://sua-api-real.com/ips
+3. **Edite o arquivo `.env` com suas configurações:**
+   ```env
+   API_URL=http://seu-servidor:5050
+   API_USERNAME=seu_usuario
+   API_PASSWORD=sua_senha
+   SSH_USER=pi
+   PRIVATE_KEY_FILE=/home/hids/.ssh/id_rsa
    ```
 
-4. **Configure o Ansible**
-   
-   Verifique se o arquivo `ansible.cfg` está configurado corretamente:
-   ```ini
-   [defaults]
-   inventory = inventory.ini
-   private_key_file = ../.ssh/ansible
-   ```
-
-5. **Prepare os scripts de mitigação**
-   
-   Certifique-se que os scripts em `scripts/` têm permissão de execução:
+4. **Garanta que os scripts shell tenham permissão de execução:**
    ```bash
    chmod +x scripts/*.sh
    ```
 
-## Execução
-
-1. **Construa e inicie o container**
+5. **Construa e inicie o container:**
    ```bash
-   docker-compose build
-   docker-compose up -d
+   docker-compose up -d --build
    ```
 
-2. **Verifique os logs**
+6. **Verifique os logs para garantir que está tudo funcionando:**
    ```bash
    docker-compose logs -f
    ```
 
-## Monitoramento
+## ⚙️ Configuração
 
-- **Verificar status do serviço**
-  ```bash
-  docker-compose ps
-  ```
+### Configurações do Ansible
 
-- **Verificar logs do watchdog**
-  ```bash
-  docker-compose logs -f ansible_watchdog
-  ```
+O arquivo `ansible.cfg` contém as configurações principais do Ansible. As configurações mais importantes são:
 
-## Comandos Úteis
+```ini
+[defaults]
+private_key_file = /home/hids/.ssh/ansible_key
+host_key_checking = False
+inventory = /app/Api_watchdog/dynamic_inventory.py
+```
 
-- **Parar o serviço**
-  ```bash
-  docker-compose down
-  ```
+### Scripts de Mitigação
 
-- **Reiniciar o serviço**
-  ```bash
-  docker-compose restart
-  ```
+Os scripts de mitigação estão localizados no diretório `scripts/`:
 
-- **Executar o playbook manualmente**
-  ```bash
-  docker-compose exec ansible_watchdog ansible-playbook rules_playbook.yml
-  ```
+- `block_https.sh`: Bloqueia tráfego HTTPS
+- `restore_https.sh`: Restaura tráfego HTTPS
+- `reset_iptables.sh`: Reseta regras do iptables
+- `limit_https.sh`: Limita tráfego HTTPS
 
-## Troubleshooting
+## 🎮 Uso
 
-1. **Serviço não inicia**
-   - Verifique se a URL da API está correta
-   - Verifique os logs do container
-   - Confirme se as permissões dos scripts estão corretas
+### Iniciar o Serviço
 
-2. **Playbook falha ao executar**
-   - Verifique se os scripts em `scripts/` têm permissão de execução
-   - Confirme se o container tem acesso à rede host
+```bash
+docker-compose up -d
+```
+
+### Verificar Logs
+
+```bash
+docker-compose logs -f
+```
+
+### Parar o Serviço
+
+```bash
+docker-compose down
+```
+
+## 📊 Monitoramento
+
+O sistema gera logs em `/app/logs/watchdog.log` dentro do container. Para monitorar em tempo real:
+
+```bash
+docker-compose exec hips tail -f /app/logs/watchdog.log
+```
+
+### Métricas
+
+O sistema registra métricas em `/app/state/metrics.json`, incluindo:
+- IPs processados
+- Bloqueios bem-sucedidos
+- Falhas de bloqueio
+
+## 🔍 Solução de Problemas
+
+### Problemas Comuns
+
+1. **Erro de Conexão SSH**
+   - Verifique se a chave SSH está corretamente configurada
+   - Confirme se o usuário SSH tem permissões adequadas
+
+2. **Falha na Execução do Playbook**
    - Verifique os logs do Ansible
+   - Confirme se os scripts de mitigação são executáveis
 
-3. **API não responde**
-   - Confirme se a URL da API está acessível
-   - Verifique se o formato da resposta da API está correto
-   - Verifique se há problemas de rede
+3. **Erro de Autenticação na API**
+   - Verifique as credenciais no arquivo `.env`
+   - Confirme se a API está acessível
 
-## Configurações Avançadas
+### Comandos Úteis
 
-1. **Ajustar intervalo de verificação**
-   
-   O intervalo padrão é de 5 minutos. Para alterar, modifique a variável `check_interval` em `Api_watchdog/watchdog_service.py`.
+```bash
+# Verificar status do container
+docker-compose ps
 
-2. **Configurar regras personalizadas**
-   
-   Edite os scripts em `scripts/` para personalizar as regras de mitigação.
+# Reiniciar o serviço
+docker-compose restart
 
-3. **Configurar logs**
-   
-   Os logs são armazenados em `watchdog.log`. Configure o nível de log em `Api_watchdog/watchdog_service.py`.
+# Verificar logs de erro
+docker-compose logs --tail=100 -f
+```
 
-## Segurança
+## 🔒 Segurança
 
-- O sistema requer privilégios elevados para executar regras iptables
-- Mantenha as chaves SSH e credenciais seguras
-- Monitore regularmente os logs em busca de atividades suspeitas
+### Boas Práticas
 
-## Suporte
+1. **Chaves SSH**
+   - Use chaves SSH específicas para o serviço
+   - Mantenha as chaves privadas seguras
+   - Não compartilhe chaves entre ambientes
 
-Para reportar problemas ou sugerir melhorias, abra uma issue no repositório.
+2. **Credenciais da API**
+   - Use credenciais fortes
+   - Atualize regularmente as senhas
+   - Não compartilhe credenciais entre ambientes
+
+3. **Permissões de Arquivos**
+   - Mantenha os scripts com permissões mínimas necessárias
+   - Use o usuário não-root `hids` no container
+
+### Recomendações
+
+- Mantenha o sistema atualizado
+- Monitore regularmente os logs
+- Faça backup das configurações
+- Implemente monitoramento externo
+
+## 📝 Licença
+
+Este projeto está licenciado sob a licença MIT - veja o arquivo [LICENSE](LICENSE) para detalhes.
+
+## 🤝 Contribuição
+
+Contribuições são bem-vindas! Por favor, leia o arquivo [CONTRIBUTING.md](CONTRIBUTING.md) para detalhes sobre nosso código de conduta e o processo para enviar pull requests.

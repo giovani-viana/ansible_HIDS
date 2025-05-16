@@ -1,0 +1,40 @@
+---
+- name: Configuração inicial dos hosts
+  hosts: Mirai_Bots
+  become: yes
+  gather_facts: no
+  tasks:
+    - name: Atualizar lista de pacotes
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+
+    - name: Configurar usuário pi
+      user:
+        name: pi
+        password: "{{ 'raspberry' | password_hash('sha512') }}"
+        groups: sudo
+        append: yes
+
+    - name: Configurar SSH
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: "{{ item.regexp }}"
+        line: "{{ item.line }}"
+      with_items:
+        - { regexp: '^#?PasswordAuthentication', line: 'PasswordAuthentication yes' }
+        - { regexp: '^#?PermitRootLogin', line: 'PermitRootLogin no' }
+        - { regexp: '^#?PubkeyAuthentication', line: 'PubkeyAuthentication yes' }
+      notify: restart ssh
+
+    - name: Garantir que o serviço SSH está ativo
+      service:
+        name: ssh
+        state: started
+        enabled: yes
+
+  handlers:
+    - name: restart ssh
+      service:
+        name: ssh
+        state: restarted 

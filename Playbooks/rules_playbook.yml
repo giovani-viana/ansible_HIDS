@@ -1,0 +1,59 @@
+- name: Aplicar regras de mitigação
+  hosts: Mirai_Bots
+  gather_facts: false
+  vars:
+    scripts_dir: "/app/scripts"
+
+  tasks:
+    - name: Testar conectividade SSH
+      ping:
+      register: ping_result
+      ignore_errors: true
+
+    - name: Debug resultado do ping
+      debug:
+        var: ping_result
+
+    - name: Falhar se não houver conectividade
+      fail:
+        msg: "Não foi possível estabelecer conexão com o host {{ inventory_hostname }}"
+      when: ping_result is failed
+
+    - name: Copiar script para o host remoto
+      copy:
+        src: "{{ scripts_dir }}/block_https.sh"
+        dest: "/tmp/block_https.sh"
+        mode: '0755'
+
+    - name: Verificar existência do script no host remoto
+      stat:
+        path: "/tmp/block_https.sh"
+      register: block_https_stat
+
+    - name: Debug stat do script no host remoto
+      debug:
+        var: block_https_stat
+
+    - name: Falhar se script não existir no host remoto
+      fail:
+        msg: "Script block_https.sh não encontrado em /tmp/"
+      when: not block_https_stat.stat.exists
+
+    - name: Executar script no host remoto
+      shell: "/tmp/block_https.sh"
+      become: true
+      become_user: root
+      register: script_output
+
+    - name: Resultado do script
+      debug:
+        var: script_output
+
+    - name: Falhar se script retornou erro
+      fail:
+        msg: "Erro ao executar script block_https.sh no host {{ inventory_hostname }}"
+      when: script_output.rc != 0
+
+    - name: Log de execução
+      debug:
+        msg: "Execução concluída para o host {{ inventory_hostname }}"

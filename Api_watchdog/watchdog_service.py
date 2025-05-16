@@ -1,251 +1,169 @@
 #!/usr/bin/env python3
-import requests
 import time
 import subprocess
 import logging
-from logging.handlers import RotatingFileHandler
-from datetime import datetime, timedelta
+from datetime import datetime
+from .auth import APIAuthentication
+from .config import Config
 import os
-import json
-import hashlib
-from pathlib import Path
-from config import Config
 
-class StateManager:
-    def __init__(self, state_file):
-        self.state_file = state_file
-        self.state = self.load_state()
-        
-    def load_state(self):
-        try:
-            with open(self.state_file, 'r') as f:
-                return json.load(f)
-        except:
-            return {"last_ips": [], "last_update": None}
-            
-    def save_state(self, ips):
-        state = {
-            "last_ips": list(ips),
-            "last_update": datetime.now().isoformat()
-        }
-        os.makedirs(os.path.dirname(self.state_file), exist_ok=True)
-        with open(self.state_file, 'w') as f:
-            json.dump(state, f)
-            
-    @property
-    def last_ips(self):
-        return set(self.state.get("last_ips", []))
-
-class SecurityManager:
-    def __init__(self, checksums_file):
-        self.checksums_file = checksums_file
-        self.load_checksums()
-        
-    def load_checksums(self):
-        try:
-            with open(self.checksums_file, 'r') as f:
-                self.checksums = json.load(f)
-        except:
-            self.checksums = {}
-            
-    def verify_script(self, script_path):
-        if not os.path.exists(script_path):
-            return False
-            
-        with open(script_path, 'rb') as f:
-            content = f.read()
-            current_hash = hashlib.sha256(content).hexdigest()
-            
-        return current_hash == self.checksums.get(script_path)
-        
-    def update_checksum(self, script_path):
-        with open(script_path, 'rb') as f:
-            content = f.read()
-            self.checksums[script_path] = hashlib.sha256(content).hexdigest()
-            
-        os.makedirs(os.path.dirname(self.checksums_file), exist_ok=True)
-        with open(self.checksums_file, 'w') as f:
-            json.dump(self.checksums, f)
-
-class AnsibleWatchdog:
+class AnsibleWatchdog(APIAuthentication):
     def __init__(self):
+        super().__init__()
+        self.config = Config()
         self.setup_logging()
-        self.state_manager = StateManager(Config.STATE_FILE)
-        self.security_manager = SecurityManager(Config.SCRIPT_CHECKSUMS_FILE)
-        self.access_token = None
-        self.token_expiration = None
-        self.retry_attempt = 0
-        
-    def setup_logging(self):
-        os.makedirs(os.path.dirname(Config.LOG_FILE), exist_ok=True)
-        handler = RotatingFileHandler(
-            Config.LOG_FILE,
-            maxBytes=Config.LOG_MAX_SIZE,
-            backupCount=Config.LOG_BACKUP_COUNT
-        )
-        logging.basicConfig(
-            level=getattr(logging, Config.LOG_LEVEL),
-            format=Config.LOG_FORMAT,
-            handlers=[handler, logging.StreamHandler()]
-        )
-        
-    def get_token(self):
-        if (self.access_token and self.token_expiration and 
-            datetime.now() < self.token_expiration - Config.TOKEN_REFRESH_MARGIN):
-            return True
-            
-        try:
-            response = requests.post(
-                f"{Config.API_URL}/token",
-                data={
-                    "username": Config.API_USERNAME,
-                    "password": Config.API_PASSWORD,
-                    "grant_type": "password"
-                },
-                verify=Config.VERIFY_SSL
-            )
-            response.raise_for_status()
-            token_data = response.json()
-            self.access_token = token_data["access_token"]
-            # Assumindo que o token expira em 30 minutos
-            self.token_expiration = datetime.now() + timedelta(minutes=30)
-            logging.info("Token de autenticação obtido com sucesso")
-            return True
-        except requests.RequestException as e:
-            logging.error(f"Erro na requisição do token: {str(e)}")
-            return False
-        except Exception as e:
-            logging.error(f"Erro ao obter token: {str(e)}")
-            return False
+        self.logger.info("Iniciando validação de ambiente...")
+        self._validate_scripts()
+        self.logger.info("Ambiente validado com sucesso")
 
-    def validate_ip(self, ip):
-        try:
-            parts = ip.split('.')
-            return len(parts) == 4 and all(0 <= int(part) <= 255 for part in parts)
-        except:
-            return False
+    def setup_logging(self):
+        """Configura o sistema de logging"""
+        logging.basicConfig(
+            level=self.config.LOG_LEVEL,
+            format=self.config.LOG_FORMAT,
+            filename=self.config.LOG_FILE
+        )
+        self.logger = logging.getLogger(__name__)
 
     def get_ips_from_api(self):
-        if not self.access_token and not self.get_token():
-            return None, []
+        """Obtém os IPs de ataques da API"""
+        response = self.make_authenticated_request(
+            'GET',
+            '/dados/ataques/novos',
+            timeout=30
+        )
+        
+        if not response or response.status_code != 200:
+            return []
 
+        ataques = response.json().get("dados", [])
+        
+        if not ataques:
+            self.logger.info("Nenhum novo ataque detectado")
+            return []
+
+        ips = []
+        for ataque in ataques:
+            if len(ataque) > 1:
+                src_ip = ataque[1]
+                if src_ip != "0.0.0.0":
+                    ips.append((src_ip, ataque[0]))  # Inclui flow_id
+
+        self.logger.info(f"Encontrados {len(ips)} IPs de ataques")
+        return ips
+
+    def execute_ansible_playbook(self, flow_id):
+        """Executa playbook ansible com melhor tratamento de erros"""
         try:
-            headers = {"Authorization": f"Bearer {self.access_token}"}
-            response = requests.get(
-                f"{Config.API_URL}/dados/ataques/novos",
-                headers=headers,
-                timeout=30,
-                verify=Config.VERIFY_SSL
-            )
-            
-            if response.status_code == 401:
-                if not self.get_token():
-                    return None, []
-                headers = {"Authorization": f"Bearer {self.access_token}"}
-                response = requests.get(
-                    f"{Config.API_URL}/dados/ataques/novos",
-                    headers=headers,
-                    timeout=30,
-                    verify=Config.VERIFY_SSL
-                )
-
-            response.raise_for_status()
-            ataques = response.json().get("dados", [])
-                        
-            if not ataques:
-                logging.info("Nenhum novo ataque detectado")
-                return set(), []
-
-            ips = set()
-            flow_ids = []
-            for ataque in ataques:
-                if len(ataque) > 1:
-                    flow_id = ataque[0]
-                    src_ip = ataque[1]
-                    if self.validate_ip(src_ip):
-                        ips.add(f"pi@{src_ip}")
-                        flow_ids.append(flow_id)
-            
-            logging.info(f"Encontrados {len(ips)} IPs únicos de ataques")
-            return ips, flow_ids
-
-        except requests.RequestException as e:
-            logging.error(f"Erro na requisição da API: {str(e)}")
-            return None, []
-        except Exception as e:
-            logging.error(f"Erro ao obter IPs: {str(e)}")
-            return None, []
-
-    def verify_scripts(self):
-        # Validação de integridade desativada
-        return True
-
-    def execute_ansible_playbook(self, flow_ids):
-        if not self.verify_scripts():
-            logging.error("Verificação de scripts falhou")
-            return False
-
-        try:
-            logging.info("Executando playbook Ansible...")
-            ips_str = ','.join(self.state_manager.last_ips)
-            flow_ids_str = ','.join(map(str, flow_ids))
-            
-            result = subprocess.run(
+            self.logger.info("Executando playbook Ansible...")
+            process = subprocess.run(
                 [
                     "ansible-playbook",
-                    "rules_playbook.yml",
-                    "-e", f"target_ips={ips_str}",
-                    "-e", f"flow_ids={flow_ids_str}",
-                    "-e", f"access_token={self.access_token}",
-                    "-vvvv",
+                    self.config.ANSIBLE_PLAYBOOK_PATH,
+                    "-i", self.config.ANSIBLE_INVENTORY_PATH
                 ],
                 capture_output=True,
                 text=True,
-                check=True
+                timeout=self.config.ANSIBLE_TIMEOUT
             )
-            logging.info("Playbook executado com sucesso")
-            logging.info(f"STDOUT do playbook:\n{result.stdout}")
-            logging.info(f"STDERR do playbook:\n{result.stderr}")
-            self.retry_attempt = 0
-            return True
-            
-        except subprocess.CalledProcessError as e:
-            logging.error(f"Erro na execução do playbook: {e.stderr}")
+
+            if process.stdout:
+                self.logger.info("Saída do Ansible:\n" + process.stdout)
+            if process.stderr:
+                self.logger.error("Erros do Ansible:\n" + process.stderr)
+
+            return process.returncode == 0
+
+        except subprocess.TimeoutExpired:
+            self.logger.error("Playbook Ansible excedeu o tempo limite")
             return False
         except Exception as e:
+            self.logger.error(f"Erro inesperado ao executar playbook: {str(e)}")
             return False
 
-    def exponential_backoff(self):
-        delay = min(Config.MAX_RETRY_INTERVAL, 
-                   Config.CHECK_INTERVAL * (2 ** self.retry_attempt))
-        self.retry_attempt += 1
-        return delay
+    def mark_attack_as_resolved(self, flow_id):
+        """Marca ataque como processado"""
+        response = self.make_authenticated_request(
+            'PUT',
+            f"/dados/ataques/processar/{flow_id}"
+        )
+        
+        if response and response.status_code == 200:
+            self.logger.info(f"Ataque {flow_id} marcado como processado com sucesso!")
+            return True
+            
+        self.logger.error(f"Falha ao marcar ataque {flow_id} como processado")
+        return False
+
+    def process_attack(self, ip, flow_id):
+        """Processa um ataque individual"""
+        self.logger.info(f"Processando IP: {ip} com flow_id: {flow_id}")
+        
+        if not self.execute_ansible_playbook(flow_id):
+            self.logger.error("Falha ao aplicar mitigação")
+            return False
+            
+        self.logger.info("Mitigação aplicada com sucesso")
+        
+        if self.mark_attack_as_resolved(flow_id):
+            return True
+            
+        self.logger.warning("Mitigação aplicada mas falha ao marcar como resolvido")
+        return False
 
     def run(self):
-        logging.info("Iniciando serviço de monitoramento...")
-        
+        """Loop principal do serviço"""
+        self.logger.info("Iniciando serviço de monitoramento...")
+
         while True:
             try:
-                current_ips, flow_ids = self.get_ips_from_api()
-                
-                if current_ips is not None and current_ips != self.state_manager.last_ips:
-                    logging.info(f"Detectada mudança na lista de IPs")
-                    logging.info(f"IPs anteriores: {self.state_manager.last_ips}")
-                    logging.info(f"Novos IPs: {current_ips}")
-                    
-                    if current_ips:
-                        self.state_manager.save_state(current_ips)
-                        if self.execute_ansible_playbook(flow_ids):
+                ips = self.get_ips_from_api()
+
+                if ips:
+                    self.logger.info(f"Novos IPs detectados: {ips}")
+                    ip_to_flowids = {}
+                    for ip, flow_id in ips:
+                        if ip not in ip_to_flowids:
+                            ip_to_flowids[ip] = []
+                        ip_to_flowids[ip].append(flow_id)
+
+                    for ip, flow_ids in ip_to_flowids.items():
+                        self.logger.info(f"Processando IP: {ip} com flow_ids: {flow_ids}")
+                        if self.execute_ansible_playbook(flow_ids[0]):
+                            self.logger.info(f"Mitigação aplicada com sucesso para o IP {ip}")
                             for flow_id in flow_ids:
-                                self.marcar_ataque_processado(flow_id)
-                
-                time.sleep(Config.CHECK_INTERVAL)
-                
+                                self.mark_attack_as_resolved(flow_id)
+                        else:
+                            self.logger.error(f"Falha ao aplicar mitigação para o IP {ip}")
+
+                time.sleep(self.config.CHECK_INTERVAL)
+
             except Exception as e:
-                logging.error(f"Erro no loop principal: {str(e)}")
-                delay = self.exponential_backoff()
-                logging.info(f"Aguardando {delay} segundos antes de tentar novamente")
-                time.sleep(delay)
+                self.logger.error(f"Erro crítico no loop principal: {str(e)}")
+                time.sleep(self.config.CHECK_INTERVAL * 2)
+
+    def _validate_environment(self):
+        """Validação completa do ambiente"""
+        required_files = [
+            self.config.ANSIBLE_INVENTORY_PATH,
+            self.config.ANSIBLE_PLAYBOOK_PATH
+        ]
+        required_scripts = [
+            'block_https.sh',
+            'restore_https.sh',
+            'reset_iptables.sh'
+        ]
+        
+        for file in required_files:
+            if not os.path.exists(file):
+                raise FileNotFoundError(f"Arquivo necessário não encontrado: {file}")
+            
+        for script in required_scripts:
+            script_path = os.path.join(self.config.BASE_DIR, 'scripts', script)
+            if not os.path.exists(script_path):
+                raise FileNotFoundError(f"Script necessário não encontrado: {script}")
+            if not os.access(script_path, os.X_OK):
+                raise PermissionError(f"Script não tem permissão de execução: {script}")
 
 if __name__ == "__main__":
     watchdog = AnsibleWatchdog()

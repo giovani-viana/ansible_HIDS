@@ -1,0 +1,141 @@
+---
+- name: Reset Complete SSH Configuration
+  hosts: all
+  become: true
+  tasks:
+    - name: Backup current SSH config
+      copy:
+        src: /etc/ssh/sshd_config
+        dest: /etc/ssh/sshd_config.backup
+        remote_src: yes
+
+    - name: Backup current SSH host keys
+      shell: |
+        mkdir -p /etc/ssh/backup_keys
+        cp /etc/ssh/ssh_host_* /etc/ssh/backup_keys/
+      args:
+        creates: /etc/ssh/backup_keys
+
+    - name: Remove all SSH host keys
+      file:
+        path: "{{ item }}"
+        state: absent
+      with_items:
+        - /etc/ssh/ssh_host_rsa_key
+        - /etc/ssh/ssh_host_rsa_key.pub
+        - /etc/ssh/ssh_host_ecdsa_key
+        - /etc/ssh/ssh_host_ecdsa_key.pub
+        - /etc/ssh/ssh_host_ed25519_key
+        - /etc/ssh/ssh_host_ed25519_key.pub
+
+    - name: Generate new SSH host keys
+      shell: |
+        ssh-keygen -t rsa -b 4096 -f /etc/ssh/ssh_host_rsa_key -N ""
+        ssh-keygen -t ecdsa -b 521 -f /etc/ssh/ssh_host_ecdsa_key -N ""
+        ssh-keygen -t ed25519 -f /etc/ssh/ssh_host_ed25519_key -N ""
+      args:
+        creates: /etc/ssh/ssh_host_rsa_key
+
+    - name: Reset SSH config to default
+      copy:
+        content: |
+          # Default SSH configuration
+          Port 22
+          Protocol 2
+          HostKey /etc/ssh/ssh_host_rsa_key
+          HostKey /etc/ssh/ssh_host_ecdsa_key
+          HostKey /etc/ssh/ssh_host_ed25519_key
+          UsePrivilegeSeparation yes
+          KeyRegenerationInterval 3600
+          ServerKeyBits 1024
+          SyslogFacility AUTH
+          LogLevel INFO
+          LoginGraceTime 120
+          PermitRootLogin no
+          StrictModes yes
+          RSAAuthentication yes
+          PubkeyAuthentication yes
+          IgnoreRhosts yes
+          RhostsRSAAuthentication no
+          HostbasedAuthentication no
+          PermitEmptyPasswords no
+          ChallengeResponseAuthentication no
+          X11Forwarding yes
+          X11DisplayOffset 10
+          PrintMotd no
+          PrintLastLog yes
+          TCPKeepAlive yes
+          AcceptEnv LANG LC_*
+          Subsystem sftp /usr/lib/openssh/sftp-server
+          UsePAM yes
+        dest: /etc/ssh/sshd_config
+        mode: '0644'
+
+    - name: Remove all authorized keys
+      file:
+        path: "{{ item }}"
+        state: absent
+      with_items:
+        - /root/.ssh/authorized_keys
+        - /home/pi/.ssh/authorized_keys
+        - /root/.ssh/known_hosts
+        - /home/pi/.ssh/known_hosts
+
+    - name: Remove all SSH directories
+      file:
+        path: "{{ item }}"
+        state: absent
+      with_items:
+        - /root/.ssh
+        - /home/pi/.ssh
+
+    - name: Create new SSH directories
+      file:
+        path: "{{ item.path }}"
+        state: directory
+        mode: "{{ item.mode }}"
+        owner: "{{ item.owner }}"
+        group: "{{ item.group }}"
+      with_items:
+        - { path: /root/.ssh, mode: '0700', owner: root, group: root }
+        - { path: /home/pi/.ssh, mode: '0700', owner: pi, group: pi }
+
+    - name: Set correct permissions for SSH config
+      file:
+        path: /etc/ssh/sshd_config
+        mode: '0644'
+        owner: root
+        group: root
+
+    - name: Set correct permissions for SSH host keys
+      file:
+        path: "{{ item }}"
+        mode: '0600'
+        owner: root
+        group: root
+      with_items:
+        - /etc/ssh/ssh_host_rsa_key
+        - /etc/ssh/ssh_host_ecdsa_key
+        - /etc/ssh/ssh_host_ed25519_key
+
+    - name: Set correct permissions for SSH host public keys
+      file:
+        path: "{{ item }}"
+        mode: '0644'
+        owner: root
+        group: root
+      with_items:
+        - /etc/ssh/ssh_host_rsa_key.pub
+        - /etc/ssh/ssh_host_ecdsa_key.pub
+        - /etc/ssh/ssh_host_ed25519_key.pub
+
+    - name: Restart SSH service
+      service:
+        name: sshd
+        state: restarted
+
+    - name: Wait for SSH to be available
+      wait_for:
+        port: 22
+        delay: 5
+        timeout: 30 
