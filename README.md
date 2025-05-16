@@ -5,6 +5,7 @@ Sistema automatizado de mitigação de ataques utilizando Ansible para gerenciar
 ## 📋 Índice
 
 - [Visão Geral](#visão-geral)
+- [Estrutura do Projeto](#estrutura-do-projeto)
 - [Requisitos](#requisitos)
 - [Instalação](#instalação)
 - [Configuração](#configuração)
@@ -17,6 +18,28 @@ Sistema automatizado de mitigação de ataques utilizando Ansible para gerenciar
 
 Este sistema monitora continuamente uma API de detecção de ataques e, quando detecta um ataque, aplica automaticamente regras de mitigação nos dispositivos IoT afetados utilizando Ansible. O sistema é containerizado e pode ser facilmente implantado em qualquer ambiente que suporte Docker.
 
+## 🗂️ Estrutura do Projeto
+
+```text
+ansible_HIPS/
+├── Api_watchdog/
+│   ├── __init__.py
+│   ├── auth.py
+│   ├── config.py
+│   ├── dynamic_inventory.py
+│   └── watchdog_service.py
+├── scripts/
+│   ├── block_https.sh
+│   ├── limit_https.sh
+│   ├── reset_iptables.sh
+│   └── restore_https.sh
+├── ansible.cfg
+├── docker-compose.yml
+├── Dockerfile
+├── rules_playbook.yml
+└── .env.example
+```
+
 ## 🔧 Requisitos
 
 - Docker e Docker Compose
@@ -24,32 +47,42 @@ Este sistema monitora continuamente uma API de detecção de ataques e, quando d
 - Acesso SSH aos dispositivos IoT
 - Chave SSH para autenticação nos dispositivos
 
-## 🚀 Instalação
+## 🚀 Instalação e Início Rápido
 
-1. Clone o repositório:
-```bash
-git clone https://seu-repositorio/ansible_HIPS.git
-cd ansible_HIPS
-```
+1. **Clone o repositório:**
+   ```bash
+   git clone https://seu-repositorio/ansible_HIPS.git
+   cd ansible_HIPS
+   ```
 
-2. Crie o arquivo `.env` com as configurações necessárias:
-```bash
-cp .env.example .env
-```
+2. **Crie o arquivo `.env` com base no exemplo:**
+   ```bash
+   cp .env.example .env
+   ```
 
-3. Edite o arquivo `.env` com suas configurações:
-```env
-API_URL=http://seu-servidor:5050
-API_USERNAME=seu_usuario
-API_PASSWORD=sua_senha
-SSH_USER=pi
-PRIVATE_KEY_FILE=/home/hids/.ssh/id_rsa
-```
+3. **Edite o arquivo `.env` com suas configurações:**
+   ```env
+   API_URL=http://seu-servidor:5050
+   API_USERNAME=seu_usuario
+   API_PASSWORD=sua_senha
+   SSH_USER=pi
+   PRIVATE_KEY_FILE=/home/hids/.ssh/id_rsa
+   ```
 
-4. Construa e inicie o container:
-```bash
-docker-compose up -d --build
-```
+4. **Garanta que os scripts shell tenham permissão de execução:**
+   ```bash
+   chmod +x scripts/*.sh
+   ```
+
+5. **Construa e inicie o container:**
+   ```bash
+   docker-compose up -d --build
+   ```
+
+6. **Verifique os logs para garantir que está tudo funcionando:**
+   ```bash
+   docker-compose logs -f
+   ```
 
 ## ⚙️ Configuração
 
