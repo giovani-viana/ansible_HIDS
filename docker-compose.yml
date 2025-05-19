@@ -14,4 +14,4 @@ services:
     restart: always
     env_file:
       - .env
-    command: python Api_watchdog/watchdog_service.py
+    command: python -m Api_watchdog.watchdog_service

@@ -51,4 +51,4 @@ ENV PYTHONUNBUFFERED=1 \
 USER hids
 
 # Comando padrão
-CMD ["python", "Api_watchdog/watchdog_service.py"]
+CMD ["python", "-m", "Api_watchdog.watchdog_service"]
