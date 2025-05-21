@@ -13,7 +13,7 @@ class AnsibleWatchdog(APIAuthentication):
         self.config = Config()
         self.setup_logging()
         self.logger.info("Iniciando validação de ambiente...")
-        self._validate_scripts()
+        self._validate_environment()
         self.logger.info("Ambiente validado com sucesso")
 
     def setup_logging(self):
