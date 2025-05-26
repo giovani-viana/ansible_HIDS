@@ -33,7 +33,7 @@ class Config:
     
     # Configurações de arquivos
     ANSIBLE_VARS_FILE = os.path.join(STATE_DIR, "ansible_vars.json")
-    PRIVATE_KEY_FILE = os.getenv('PRIVATE_KEY_FILE', '/home/hids/.ssh/ansible_key')
+    PRIVATE_KEY_FILE = os.getenv('PRIVATE_KEY_FILE', '/home/hids/.ssh/id_rsa')
     
     # Configurações de logging
     LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO').upper()
@@ -43,7 +43,7 @@ class Config:
     ANSIBLE_TIMEOUT = int(os.getenv('ANSIBLE_TIMEOUT', '60'))  # Aumentado para 60 segundos
     ANSIBLE_RETRY_COUNT = int(os.getenv('ANSIBLE_RETRY_COUNT', '3'))
     ANSIBLE_RETRY_DELAY = int(os.getenv('ANSIBLE_RETRY_DELAY', '5'))
-    ANSIBLE_PLAYBOOK_PATH = os.getenv('ANSIBLE_PLAYBOOK_PATH', '/home/hids/ansible_HIPS/Playbooks')
+    ANSIBLE_PLAYBOOK_PATH = os.getenv('ANSIBLE_PLAYBOOK_PATH', 'rules_playbook.yml')
     ANSIBLE_INVENTORY_PATH = os.getenv('ANSIBLE_INVENTORY_PATH', 'Api_watchdog/dynamic_inventory.py')
     ANSIBLE_REMOTE_USER = os.getenv('ANSIBLE_REMOTE_USER', 'pi')
     

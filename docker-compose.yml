@@ -7,7 +7,7 @@ services:
     volumes:
       - ./scripts:/app/scripts
       - ./ansible.cfg:/app/ansible.cfg
-      - ./Playbooks:/home/hids/ansible_HIPS/Playbooks
+      - ./rules_playbook.yml:/app/rules_playbook.yml
       - ~/.ssh:/home/hids/.ssh:ro
       - ./.env:/app/.env:ro
       - ./logs:/app/logs
