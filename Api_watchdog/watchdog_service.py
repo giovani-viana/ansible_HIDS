@@ -6,6 +6,7 @@ from datetime import datetime
 from .auth import APIAuthentication
 from .config import Config
 import os
+import sys
 
 class AnsibleWatchdog(APIAuthentication):
     def __init__(self):
@@ -18,12 +19,52 @@ class AnsibleWatchdog(APIAuthentication):
 
     def setup_logging(self):
         """Configura o sistema de logging"""
-        logging.basicConfig(
-            level=self.config.LOG_LEVEL,
-            format=self.config.LOG_FORMAT,
-            filename=self.config.LOG_FILE
-        )
+        # Configurar o formato do log com cores
+        class ColoredFormatter(logging.Formatter):
+            """Formatter customizado com cores"""
+            grey = "\x1b[38;21m"
+            blue = "\x1b[38;5;39m"
+            yellow = "\x1b[38;5;226m"
+            red = "\x1b[38;5;196m"
+            bold_red = "\x1b[31;1m"
+            reset = "\x1b[0m"
+
+            def __init__(self, fmt):
+                super().__init__()
+                self.fmt = fmt
+                self.FORMATS = {
+                    logging.DEBUG: self.grey + self.fmt + self.reset,
+                    logging.INFO: self.blue + self.fmt + self.reset,
+                    logging.WARNING: self.yellow + self.fmt + self.reset,
+                    logging.ERROR: self.red + self.fmt + self.reset,
+                    logging.CRITICAL: self.bold_red + self.fmt + self.reset
+                }
+
+            def format(self, record):
+                log_fmt = self.FORMATS.get(record.levelno)
+                formatter = logging.Formatter(log_fmt)
+                return formatter.format(record)
+
+        # Formato detalhado do log
+        log_format = '%(asctime)s | %(levelname)-8s | %(name)s | %(message)s'
+        
+        # Configurar handler para arquivo
+        file_handler = logging.FileHandler(self.config.LOG_FILE)
+        file_handler.setFormatter(logging.Formatter(log_format))
+
+        # Configurar handler para console com cores
+        console_handler = logging.StreamHandler(sys.stdout)
+        console_handler.setFormatter(ColoredFormatter(log_format))
+
+        # Configurar o logger
         self.logger = logging.getLogger(__name__)
+        self.logger.setLevel(self.config.LOG_LEVEL)
+        
+        # Remover handlers existentes para evitar duplicação
+        self.logger.handlers = []
+        
+        self.logger.addHandler(file_handler)
+        self.logger.addHandler(console_handler)
 
     def get_ips_from_api(self):
         """Obtém os IPs de ataques da API"""
@@ -60,7 +101,8 @@ class AnsibleWatchdog(APIAuthentication):
                 [
                     "ansible-playbook",
                     self.config.ANSIBLE_PLAYBOOK_PATH,
-                    "-i", self.config.ANSIBLE_INVENTORY_PATH
+                    "-i", self.config.ANSIBLE_INVENTORY_PATH,
+                    "-vvv"  # Aumentar verbosidade do Ansible
                 ],
                 capture_output=True,
                 text=True,

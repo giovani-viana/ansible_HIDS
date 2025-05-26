@@ -15,16 +15,19 @@ services:
     restart: always
     env_file:
       - .env
-    environment:
-      - ANSIBLE_LOG_PATH=/app/logs/ansible.log
-      - PYTHONUNBUFFERED=1
-      - ANSIBLE_DEBUG=1
-      - ANSIBLE_VERBOSITY=4
-    command: >
-      sh -c "python -m Api_watchdog.watchdog_service 2>&1 | tee -a /app/logs/app.log"
+    command: python -m Api_watchdog.watchdog_service
     logging:
       driver: "json-file"
       options:
         max-size: "10m"
         max-file: "3"
         tag: "{{.Name}}"
+    tty: true
+    stdin_open: true
+    environment:
+      - PYTHONUNBUFFERED=1
+      - ANSIBLE_FORCE_COLOR=1
+      - ANSIBLE_STDOUT_CALLBACK=yaml
+      - ANSIBLE_DISPLAY_ARGS_TO_STDOUT=1
+      - ANSIBLE_VERBOSITY=3
+      - TERM=xterm-256color
