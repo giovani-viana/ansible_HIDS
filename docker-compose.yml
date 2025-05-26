@@ -10,8 +10,21 @@ services:
       - ./rules_playbook.yml:/app/rules_playbook.yml
       - ~/.ssh:/home/hids/.ssh:ro
       - ./.env:/app/.env:ro
+      - ./logs:/app/logs
     network_mode: "host"
     restart: always
     env_file:
       - .env
-    command: python -m Api_watchdog.watchdog_service
+    environment:
+      - ANSIBLE_LOG_PATH=/app/logs/ansible.log
+      - PYTHONUNBUFFERED=1
+      - ANSIBLE_DEBUG=1
+      - ANSIBLE_VERBOSITY=4
+    command: >
+      sh -c "python -m Api_watchdog.watchdog_service 2>&1 | tee -a /app/logs/app.log"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+        tag: "{{.Name}}"
