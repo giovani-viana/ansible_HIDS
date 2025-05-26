@@ -1,8 +1,13 @@
 #!/usr/bin/env python3
 import json
 import sys
-from .auth import APIAuthentication
-from .config import Config
+import os
+
+# Adicionar o diretório pai ao PYTHONPATH
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from Api_watchdog.auth import APIAuthentication
+from Api_watchdog.config import Config
 
 class DynamicInventory(APIAuthentication):
     def __init__(self):

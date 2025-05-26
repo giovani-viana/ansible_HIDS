@@ -34,7 +34,8 @@ RUN pip install requests python-dotenv
 
 # Tornar os scripts executáveis
 RUN chmod +x /app/Api_watchdog/dynamic_inventory.py && \
-    chmod +x /app/Api_watchdog/watchdog_service.py
+    chmod +x /app/Api_watchdog/watchdog_service.py && \
+    chmod +x /app/scripts/*.sh
 
 # Configurar SSH
 RUN mkdir -p /home/hids/.ssh && \
@@ -45,7 +46,8 @@ RUN mkdir -p /home/hids/.ssh && \
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     LOG_LEVEL=INFO \
-    CHECK_INTERVAL=15
+    CHECK_INTERVAL=15 \
+    PYTHONPATH=/app
 
 # Mudar para usuário não-root
 USER hids
